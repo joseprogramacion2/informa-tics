@@ -240,6 +240,8 @@ app.use('/ordenes', ordenesMeseroRoutes);
 // Cocina
 app.use('/cocina', ordenesCocinaRoutes);
 app.use('/ordenes/cocina', ordenesCocinaRoutes); // alias
+app.use('/caja', require('./routes/caja.routes'));
+app.use('/mesas', require('./routes/mesas.routes'));
 
 // Barra
 app.use('/barra', ordenesBarraRoutes);
