@@ -32,18 +32,48 @@ function dayRangeOf(dateLike) {
   return { start, end };
 }
 
-// Identidad flexible: token -> query -> body
+// Identidad flexible: token -> header -> query -> body -> fallback helper
 function getUidFlex(req) {
-  const tkn = Number(req?.user?.id || 0) || null;
-  if (tkn) return tkn;
-  const q = Number(req?.query?.cajeroId || 0) || null;
-  if (q) return q;
-  const b = Number(req?.body?.cajeroId || 0) || null;
-  if (b) return b;
-  try { const x = getUserIdFromReq(req); if (x) return Number(x) || null; } catch {}
+  // 1) Token puesto por tu middleware (si existe)
+  const fromUser = Number(req?.user?.id || 0);
+
+  // 2) Headers (útil en Netlify/Railway, evita depender de cookies)
+  const fromHeader = Number(
+    req.get('X-Cajero-Id') ||
+    req.get('X-User-Id')   ||
+    req.get('x-cajero-id') ||
+    req.get('x-user-id')   ||
+    0
+  );
+
+  // 3) Querystring
+  const fromQuery = Number(
+    req?.query?.cajeroId || req?.query?.userId || req?.query?.adminId || 0
+  );
+
+  // 4) Body JSON
+  const fromBody = Number(
+    (req?.body && (
+      req.body.cajeroId ??
+      req.body.userId   ??
+      req.body.adminId  ??
+      (req.body.turno && req.body.turno.cajeroId)
+    )) || 0
+  );
+
+  if (fromUser)   return fromUser;
+  if (fromHeader) return fromHeader;
+  if (fromQuery)  return fromQuery;
+  if (fromBody)   return fromBody;
+
+  // 5) Fallback a tu helper local (si existe)
+  try {
+    const x = getUserIdFromReq(req);
+    if (x) return Number(x) || null;
+  } catch {}
+
   return null;
 }
-
 // ¿Tiene turno ABIERTA?
 async function tieneTurnoAbierto(uid) {
   if (!uid) return false;
