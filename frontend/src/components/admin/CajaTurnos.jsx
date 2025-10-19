@@ -14,6 +14,14 @@ function denomsTotalClient(raw = {}) {
   return Number(sum.toFixed(2));
 }
 
+/* === Helper: obtener id del usuario (admin) desde el localStorage === */
+function getAdminId() {
+  try {
+    const u = JSON.parse(localStorage.getItem('usuario') || 'null');
+    return u?.id || null;
+  } catch { return null; }
+}
+
 export default function CajaTurnos() {
   const [estado, setEstado] = useState('TODOS');
   const [turnos, setTurnos] = useState([]);
@@ -46,20 +54,29 @@ export default function CajaTurnos() {
   }
   function closeModal(){ setSel(null); setPreview(null); }
 
+  /* ======================== ACCIONES ADMIN ======================== */
   async function autorizarApertura() {
-    await http.post('/caja/turnos/admin/autorizar', { turnoId: sel.id, aprobar: true });
+    const adminId = getAdminId();
+    if (!adminId) return alert('Sesión inválida (admin no identificado). Vuelve a iniciar sesión.');
+    await http.post('/caja/turnos/admin/autorizar', { turnoId: sel.id, aprobar: true, cajeroId: adminId });
     await load(); closeModal();
   }
   async function rechazarApertura() {
-    await http.post('/caja/turnos/admin/rechazar', { turnoId: sel.id, aprobar: false });
+    const adminId = getAdminId();
+    if (!adminId) return alert('Sesión inválida (admin no identificado). Vuelve a iniciar sesión.');
+    await http.post('/caja/turnos/admin/rechazar', { turnoId: sel.id, aprobar: false, cajeroId: adminId });
     await load(); closeModal();
   }
   async function autorizarCierre() {
-    await http.post('/caja/turnos/admin/autorizar-cierre', { turnoId: sel.id, aprobar: true });
+    const adminId = getAdminId();
+    if (!adminId) return alert('Sesión inválida (admin no identificado). Vuelve a iniciar sesión.');
+    await http.post('/caja/turnos/admin/autorizar-cierre', { turnoId: sel.id, aprobar: true, cajeroId: adminId });
     await load(); closeModal();
   }
   async function rechazarCierre() {
-    await http.post('/caja/turnos/admin/rechazar-cierre', { turnoId: sel.id, aprobar: false });
+    const adminId = getAdminId();
+    if (!adminId) return alert('Sesión inválida (admin no identificado). Vuelve a iniciar sesión.');
+    await http.post('/caja/turnos/admin/rechazar-cierre', { turnoId: sel.id, aprobar: false, cajeroId: adminId });
     await load(); closeModal();
   }
 
