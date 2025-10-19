@@ -329,19 +329,20 @@ startReservasAutoSweep({ everyMs: 30_000 });
 let sendEmail;
 try { ({ sendEmail } = require('./services/email')); } catch (_) {}
 if (sendEmail) {
-  app.get('/test-mail', async (_req, res) => {
-    try {
-      await sendEmail({
-        to: process.env.SMTP_USER,
-        subject: 'Prueba SMTP Gmail',
-        html: '<h3>Hola 👋</h3><p>Correo de prueba desde el backend.</p>',
-      });
-      res.send('OK: correo enviado');
-    } catch (e) {
-      console.error('❌ Error test-mail:', e);
-      res.status(500).send(e.message);
-    }
-  });
+app.get('/test-mail', async (_req, res) => {
+  try {
+    const { sendEmail } = require('./services/email');
+    await sendEmail({
+      to: process.env.REPLY_TO || 'tu-correo@ejemplo.com',
+      subject: 'Prueba correo (Resend)',
+      html: '<h3>Hola 👋</h3><p>Prueba vía Resend API.</p>',
+    });
+    res.send('OK: correo enviado');
+  } catch (e) {
+    console.error('❌ Error test-mail:', e);
+    res.status(500).send(e.message);
+  }
+});
 }
 
 /* =========================
