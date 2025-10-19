@@ -15,6 +15,14 @@ const DENOMS = [
 ];
 const VALUES = { Q200:200, Q100:100, Q50:50, Q20:20, Q10:10, Q5:5, Q1:1, Q0_50:0.5, Q0_25:0.25 };
 
+/* === Helper para obtener el cajero actual (desde el login) === */
+function getCajeroId() {
+  try {
+    const u = JSON.parse(localStorage.getItem('usuario') || 'null');
+    return u?.id || null;
+  } catch { return null; }
+}
+
 export default function TurnoCajaPanel({
   turno,
   onRefresh,
@@ -112,9 +120,16 @@ export default function TurnoCajaPanel({
       return;
     }
 
+    const cajeroId = getCajeroId();
+    if (!cajeroId) {
+      onToast('Sesión inválida: no se encontró el cajero actual.', 'danger');
+      return;
+    }
+
     const send = async () => {
       try {
         await http.post('/caja/solicitar', {
+          cajeroId,                               // 👈 NECESARIO para getUidFlex(req)
           conteoInicial: { ...ci, total: totalFmt },
           montoApertura: totalFmt,
         });
@@ -159,9 +174,18 @@ export default function TurnoCajaPanel({
     const total = DENOMS.reduce((acc, d) => acc + Number(cf[d.key] || 0) * VALUES[d.key], 0);
     const totalFmt = Number(total.toFixed(2));
 
+    const cajeroId = getCajeroId();
+    if (!cajeroId) {
+      onToast('Sesión inválida: no se encontró el cajero actual.', 'danger');
+      return;
+    }
+
     const send = async () => {
       try {
-        await http.post(`/caja/${idTurno}/solicitar-cierre`, { conteoFinal: cf });
+        await http.post(`/caja/${idTurno}/solicitar-cierre`, {
+          cajeroId,                // 👈 NECESARIO para getUidFlex(req)
+          conteoFinal: cf
+        });
         onToast('Solicitud de cierre enviada (pendiente de autorización).', 'success');
         setShowCierre(false);
         onRefresh?.();
