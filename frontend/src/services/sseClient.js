@@ -1,6 +1,6 @@
 // Escucha el canal de repartidores (broadcast)
 export function connectSSERepartidor(onEvent) {
-  const base = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  const base = apiUrl; // <-- ya resuelto
   const es = new EventSource(`${base}/sse?topic=REPARTIDOR`, { withCredentials: true });
 
   es.addEventListener('NUEVO_PEDIDO_REPARTO', (ev) => {
