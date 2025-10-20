@@ -207,3 +207,65 @@ img,button,input,textarea{ max-width:100%; box-sizing:border-box; }
 /* Evita que el contenido empuje el layout y genere scroll horizontal global */
 html, body { max-width: 100%; overflow-x: hidden; }
 .cl-main .container, section { min-width: 0; }
+
+/* ===== Historial responsive tweaks ===== */
+
+/* Título fluido (no gigante en móvil) */
+.hist-title{
+  font-size: clamp(22px, 4.5vw, 34px);
+  line-height: 1.15;
+}
+
+/* Filtros: compactar en pantallas angostas */
+.orders-filters{
+  gap: 12px;
+}
+@media (max-width: 420px){
+  .orders-filters{
+    gap: 10px;
+    padding: 10px;
+  }
+  .orders-filters input,
+  .orders-filters select{
+    height: 40px;              /* antes 44 */
+    font-size: 14px;
+  }
+}
+
+/* Tarjeta del pedido: separar mejor en móvil */
+.order-card{ }
+.order-head{ }
+.order-actions{
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;              /* permite saltar de línea si no caben */
+  white-space: normal;          /* deja que los botones encojan */
+}
+
+/* En móvil: acciones en grilla 2×2 (o 1×N si hay menos) y a 100% de ancho */
+@media (max-width: 600px){
+  .order-head{
+    align-items: flex-start;    /* fecha/estado arriba, botones abajo */
+    gap: 10px;
+  }
+  .order-actions{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+  .order-actions > button{
+    width: 100%;
+    min-width: 0;               /* permite encoger el texto del botón */
+  }
+}
+
+/* Chips y filas: evitar desbordes */
+.order-card .chip-row,
+.order-card .meta-row{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Evitar scroll horizontal global en móvil por textos largos */
+html, body{ max-width:100%; overflow-x:hidden; }

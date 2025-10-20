@@ -1,3 +1,4 @@
+// src/pages/Historial.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import api from '../api';
 import { getUser } from "../utils/session";
@@ -55,7 +56,9 @@ function domicilioBloque(p){
   const lineas=[];
   if(nombre) lineas.push(`<div><b>Cliente:</b> ${nombre}</div>`);
   if(tel)    lineas.push(`<div><b>Tel:</b> ${tel}</div>`);
-  if(dir)    lineas.push(`<div><b>Dirección:</b> ${dir}</div>`);
+  ifdir: {
+    if(dir) lineas.push(`<div><b>Dirección:</b> ${dir}</div>`);
+  }
   if(!lineas.length) return '';
   return `<div style="margin:6px 0" class="muted">${lineas.join('')}</div>`;
 }
@@ -601,7 +604,7 @@ export default function Historial(){
     <div style={{ maxWidth: 980 }}>
       {/* Título + resumen */}
       <div style={{ marginBottom:10 }}>
-        <h1 style={{ margin:0 }}>🧾 Historial de pedidos</h1>
+        <h1 className="hist-title" style={{ margin:0 }}>🧾 Historial de pedidos</h1>
         <div style={{ color:'#475569', marginTop:6 }}>
           {resumen.count} pedidos · Total {qtz(resumen.total)} {syncing ? '· sincronizando…' : ''}
           {error ? <span style={{ marginLeft:8, color:'#b91c1c' }}>• Error al cargar</span> : null}
@@ -609,7 +612,7 @@ export default function Historial(){
       </div>
 
       {/* Filtros */}
-      <div style={ui.filters}>
+      <div className="orders-filters" style={ui.filters}>
         <div style={ui.field}>
           <label style={ui.label}>Desde</label>
           <input
@@ -678,12 +681,19 @@ export default function Historial(){
             const yaCalificado = !!p.calificacion;
 
             return (
-              <div key={p.id} style={{
-                background:'#fff', border:'1px solid #e5e7eb', borderRadius:16, padding:16,
-                boxShadow:'0 6px 18px rgba(0,0,0,.05)'
-              }}>
+              <div
+                key={p.id}
+                className="order-card"
+                style={{
+                  background:'#fff', border:'1px solid #e5e7eb', borderRadius:16, padding:16,
+                  boxShadow:'0 6px 18px rgba(0,0,0,.05)'
+                }}
+              >
                 {/* Header */}
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
+                <div
+                  className="order-head"
+                  style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}
+                >
                   <div style={{ minWidth:0, flex:"1 1 auto" }}>
                     <div style={{ display:'flex', gap:8, alignItems:'baseline', flexWrap:'wrap' }}>
                       <div style={{ fontWeight:900, fontSize:18 }}>#{p.codigo}</div>
@@ -691,7 +701,7 @@ export default function Historial(){
                       <span style={chip('#ecfeff','#155e75')}>{estadoText}</span>
                     </div>
 
-                    <div style={{ display:'flex', gap:10, flexWrap:'wrap', marginTop:6, color:'#334155' }}>
+                    <div className="meta-row" style={{ display:'flex', gap:10, flexWrap:'wrap', marginTop:6, color:'#334155' }}>
                       <span style={chip('#f1f5f9','#0f172a')}>Entrega: {(p.tipoEntrega||"").toUpperCase()}</span>
                       <span style={chip('#e0f2fe','#0c4a6e')}>Pago: {pagoLabel(p)}</span>
                       <span style={chip('#dcfce7','#065f46')}>Total: {qtz(Number(p.total))}</span>
@@ -699,13 +709,13 @@ export default function Historial(){
 
                     {p.calificacion && (
                       <div style={{ color:'#475569', marginTop:8 }}>
-                        <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
+                        <div className="meta-row" style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
                           <span><b>🍽️ Comida:</b> {p.calificacion.comida}/5</span>
                           {(p.tipoEntrega||'').toUpperCase()==='DOMICILIO'
                             ? <span><b>🚚 Repartidor:</b> {p.calificacion.repartidor||0}/5</span>
                             : <span><b>👤 Atención:</b> {p.calificacion.atencionCliente||0}/5</span>}
                         </div>
-                        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
+                        <div className="chip-row" style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
                           {(p.calificacion.comidaOpciones||[]).map(o=>(
                             <span key={'c'+o} style={chip('#e2e8f0','#0f172a')}>{o}</span>
                           ))}
@@ -720,7 +730,10 @@ export default function Historial(){
                   </div>
 
                   {/* Acciones */}
-                  <div style={{ display:"flex", gap:8, alignItems:'center', flex:"0 0 auto", whiteSpace:"nowrap" }}>
+                  <div
+                    className="order-actions"
+                    style={{ display:"flex", gap:8, alignItems:'center', flex:"0 0 auto", whiteSpace:"nowrap" }}
+                  >
                     {isEntregado && (
                       <button
                         onClick={()=>abrirRating(p)}
