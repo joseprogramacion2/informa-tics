@@ -269,3 +269,38 @@ html, body { max-width: 100%; overflow-x: hidden; }
 
 /* Evitar scroll horizontal global en móvil por textos largos */
 html, body{ max-width:100%; overflow-x:hidden; }
+
+/* Acciones del pedido: layout responsivo */
+.order-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  white-space:normal;
+}
+
+/* Móvil: grilla 2×2 (auto-fit) y ancho completo de la tarjeta */
+@media (max-width: 600px){
+  .order-head{ 
+    align-items:flex-start;
+    gap:10px;
+  }
+  .order-actions{
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    width:100%;
+    margin-top:8px;
+  }
+  .order-actions > button{
+    width:100%;
+    min-width:0;        /* evita “barras” larguísimas */
+    font-size:14px;
+    padding:10px 12px;
+  }
+}
+
+/* Desktop: el botón de imprimir puede tener un ancho mínimo cómodo */
+@media (min-width: 601px){
+  .order-actions .btn-print{
+    min-width:140px;
+  }
+}

@@ -730,45 +730,43 @@ export default function Historial(){
                   </div>
 
                   {/* Acciones */}
-                  <div
-                    className="order-actions"
-                    style={{ display:"flex", gap:8, alignItems:'center', flex:"0 0 auto", whiteSpace:"nowrap" }}
-                  >
-                    {isEntregado && (
-                      <button
-                        onClick={()=>abrirRating(p)}
-                        disabled={yaCalificado}
-                        title={yaCalificado ? "Ya calificado" : "Calificar pedido"}
-                        style={btn('#0ea5e9','#fff', !yaCalificado)}
-                      >
-                        {yaCalificado ? "Calificado" : "Calificar"}
-                      </button>
-                    )}
-                    <button
-                      onClick={()=>editar(p)}
-                      disabled={!editable}
-                      title={editable ? "Editar pedido" : "Solo pedidos pendientes con pago en local pueden editarse"}
-                      style={btn('#0f766e','#fff', editable)}
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={()=>cancelar(p)}
-                      disabled={!editable}
-                      title={editable ? "Cancelar pedido" : "Solo pedidos pendientes y con pago en local pueden cancelarse"}
-                      style={btn('#ef4444','#fff', editable)}
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      onClick={()=>imprimir(p)}
-                      disabled={!puedeImprimir}
-                      title={puedeImprimir ? "Imprimir ticket" : "Aún no disponible"}
-                      style={{ ...btn('#111827','#fff', puedeImprimir), minWidth:140 }}
-                    >
-                      Imprimir ticket
-                    </button>
-                  </div>
+                  <div className="order-actions">
+  {isEntregado && (
+    <button
+      onClick={()=>abrirRating(p)}
+      disabled={yaCalificado}
+      title={yaCalificado ? "Ya calificado" : "Calificar pedido"}
+      style={btn('#0ea5e9','#fff', !yaCalificado)}
+    >
+      {yaCalificado ? "Calificado" : "Calificar"}
+    </button>
+  )}
+  <button
+    onClick={()=>editar(p)}
+    disabled={!editable}
+    title={editable ? "Editar pedido" : "Solo pedidos pendientes con pago en local pueden editarse"}
+    style={btn('#0f766e','#fff', editable)}
+  >
+    Editar
+  </button>
+  <button
+    onClick={()=>cancelar(p)}
+    disabled={!editable}
+    title={editable ? "Cancelar pedido" : "Solo pedidos pendientes y con pago en local pueden cancelarse"}
+    style={btn('#ef4444','#fff', editable)}
+  >
+    Cancelar
+  </button>
+  <button
+    onClick={()=>imprimir(p)}
+    disabled={!puedeImprimir}
+    title={puedeImprimir ? "Imprimir ticket" : "Aún no disponible"}
+    className="btn-print"                             
+    style={{ ...btn('#111827','#fff', puedeImprimir) }} 
+  >
+    Imprimir ticket
+  </button>
+</div>
                 </div>
 
                 {/* Observación */}
