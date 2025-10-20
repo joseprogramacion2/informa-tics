@@ -12,6 +12,12 @@ export default function RealizarPedido() {
   // Drawer carrito (solo móvil)
   const [openCart, setOpenCart] = useState(false);
 
+  // Toast / feedback
+  const [toast, setToast] = useState({ open:false, text:"" });
+
+  // Contador para badge del FAB
+  const [cartCount, setCartCount] = useState(0);
+
   // Modal “Agregar con nota”
   const [noteModal, setNoteModal] = useState({
     open: false,
@@ -20,7 +26,7 @@ export default function RealizarPedido() {
     tipo: null, // 'COMESTIBLE'|'BEBIBLE'
   });
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); syncCartCount(); }, []);
   const load = async () => {
     try {
       setLoading(true);
@@ -28,11 +34,9 @@ export default function RealizarPedido() {
       const list = Array.isArray(data) ? data : [];
       setCategorias(list);
 
-      // ordenar alfabéticamente por nombre
       const first = [...list].sort((a, b) => a.nombre.localeCompare(b.nombre))[0];
       setSelectedCatId(first?.id ?? null);
 
-      // mapa idPlatillo -> tipoCategoria (COMESTIBLE | BEBIBLE) para fallback
       const map = {};
       list.forEach((cat) => {
         (cat.platillos || []).forEach((p) => { map[p.id] = cat.tipo; });
@@ -46,6 +50,23 @@ export default function RealizarPedido() {
     }
   };
 
+  // === Helpers: contador del carrito (ajusta la clave si tu utils/cart usa otra) ===
+  const CART_KEY = "cart"; // <-- si tu util usa otro nombre, cámbialo aquí
+  const syncCartCount = () => {
+    try {
+      const arr = JSON.parse(localStorage.getItem(CART_KEY) || "[]");
+      const qty = Array.isArray(arr)
+        ? arr.reduce((s, it) => s + Number(it.qty || 1), 0)
+        : 0;
+      setCartCount(qty);
+    } catch { setCartCount(0); }
+  };
+  useEffect(() => {
+    const onStorage = (e) => { if (e.key === CART_KEY) syncCartCount(); };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   const categoriasOrdenadas = useMemo(
     () => [...categorias].sort((a, b) => a.nombre.localeCompare(b.nombre)),
     [categorias]
@@ -57,6 +78,13 @@ export default function RealizarPedido() {
   );
 
   const money = (v) => `Q${Number(v ?? 0).toFixed(2)}`;
+
+  // --- Toast helpers ---
+  const showToast = (text) => {
+    setToast({ open:true, text });
+    try { navigator.vibrate && navigator.vibrate(15); } catch {}
+    setTimeout(() => setToast({ open:false, text:"" }), 1600);
+  };
 
   // Acciones modal
   const abrirModalNota = (p, tipoCat) =>
@@ -73,6 +101,25 @@ export default function RealizarPedido() {
       tipo: noteModal.tipo,
     });
     cerrarModalNota();
+    syncCartCount();
+    showToast(`✅ ${noteModal.platillo.nombre} agregado al carrito`);
+    // animación ping del FAB
+    pingFab();
+  };
+
+  // Agregar directo
+  const onAdd = (p, tipo) => {
+    addItem({ id: p.id, nombre: p.nombre, precio: p.precio, tipo });
+    syncCartCount();
+    showToast(`✅ ${p.nombre} agregado al carrito`);
+    pingFab();
+  };
+
+  // Pequeña animación del FAB
+  const [fabPing, setFabPing] = useState(false);
+  const pingFab = () => {
+    setFabPing(true);
+    setTimeout(() => setFabPing(false), 450);
   };
 
   /* ===== Styles locales mínimos ===== */
@@ -98,6 +145,22 @@ export default function RealizarPedido() {
   const modal = { background:"#fff", borderRadius:14, padding:16, width:"min(520px,96vw)", boxShadow:"0 10px 30px rgba(0,0,0,0.2)" };
   const ghost = { background:"#e2e8f0", border:"none", color:"#0f172a", padding:"6px 10px", borderRadius:8, fontWeight:700, cursor:"pointer" };
   const primary = { border:"none", background:"#111827", color:"#fff", padding:"8px 12px", borderRadius:10, cursor:"pointer" };
+
+  // Estilos Toast + Badge + Ping
+  const toastWrap = {
+    position:"fixed", left:0, right:0, bottom:78, display:"grid",
+    placeItems:"center", zIndex:10050, pointerEvents:"none"
+  };
+  const toastBox = {
+    background:"#111827", color:"#fff", padding:"10px 14px", borderRadius:12,
+    boxShadow:"0 10px 24px rgba(0,0,0,.25)", fontWeight:700, pointerEvents:"auto"
+  };
+  const badge = {
+    position:"absolute", top:-6, right:-6, minWidth:22, height:22,
+    borderRadius:999, background:"#16a34a", color:"#fff", display:"grid",
+    placeItems:"center", fontSize:12, fontWeight:900, padding:"0 6px",
+    border:"2px solid #0b1220"
+  };
 
   return (
     <>
@@ -139,7 +202,6 @@ export default function RealizarPedido() {
               <div style={grid}>
                 {(selectedCat.platillos || []).map((p) => (
                   <article key={p.id} style={card}>
-                    {/* 👇 NUEVO: contenedor con aspect-ratio para fijar altura en móvil */}
                     <div className="product-media">
                       {p.imagenUrl
                         ? <img src={p.imagenUrl} alt={p.nombre} />
@@ -154,7 +216,7 @@ export default function RealizarPedido() {
 
                       <div className="btn-row">
                         <button
-                          onClick={() => addItem({ id:p.id, nombre:p.nombre, precio:p.precio, tipo:selectedCat.tipo })}
+                          onClick={() => onAdd(p, selectedCat.tipo)}
                           style={addBtn}
                         >
                           Agregar
@@ -186,8 +248,18 @@ export default function RealizarPedido() {
         className={`cart-fab show-on-mobile ${openCart ? "hide" : ""}`}
         onClick={() => setOpenCart(true)}
         aria-label="Abrir carrito"
+        style={{
+          position:"fixed",
+          right:14,
+          bottom:14,
+          transform: fabPing ? "scale(1.06)" : "scale(1)",
+          transition:"transform .18s ease"
+        }}
       >
-        🛒 Ver carrito
+        <span style={{ position:"relative" }}>
+          🛒 Ver carrito
+          {cartCount > 0 && <span style={badge}>{cartCount}</span>}
+        </span>
       </button>
 
       {/* Drawer carrito (móvil) */}
@@ -201,6 +273,13 @@ export default function RealizarPedido() {
           <CartPanel />
         </div>
       </aside>
+
+      {/* Toast */}
+      {toast.open && (
+        <div style={toastWrap} aria-live="polite" aria-atomic="true">
+          <div style={toastBox}>{toast.text}</div>
+        </div>
+      )}
 
       {/* Modal Nota */}
       {noteModal.open && (
