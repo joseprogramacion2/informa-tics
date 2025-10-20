@@ -1,4 +1,6 @@
 // backend/src/index.js
+process.env.TZ = 'America/Guatemala';
+console.log('🕓 Zona horaria fijada en:', process.env.TZ);
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
