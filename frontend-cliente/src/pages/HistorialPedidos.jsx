@@ -199,9 +199,9 @@ const OPCIONES = {
   ]
 };
 
-/* ⭐ Estrellas doradas (SVG) con hover-preview */
+/* ⭐ Estrellas (SVG) */
 function Star({ filled, onClick, onHover, onLeave, size=28 }) {
-  const color = filled ? '#f59e0b' : '#e5e7eb';      // dorado / gris suave
+  const color = filled ? '#f59e0b' : '#e5e7eb';
   const stroke = filled ? '#d97706' : '#9ca3af';
   return (
     <svg
@@ -328,7 +328,6 @@ function RatingModal({ open, onClose, pedido, onSaved }) {
         maxHeight:'85vh', display:'flex', flexDirection:'column', overflow:'hidden',
         boxShadow:'0 14px 36px rgba(0,0,0,.28)'
       }}>
-        {/* Header */}
         <div style={{ padding:'18px 20px', borderBottom:'1px solid #e5e7eb' }}>
           <h3 style={{ margin:0, fontSize:20, fontWeight:900 }}>Calificar pedido #{pedido?.codigo}</h3>
           <p style={{ margin:'6px 0 0', color:'#475569' }}>
@@ -336,7 +335,6 @@ function RatingModal({ open, onClose, pedido, onSaved }) {
           </p>
         </div>
 
-        {/* Body */}
         <div style={{ padding:20, overflow:'auto' }}>
           <div style={{ display:'grid', gap:18 }}>
             <div>
@@ -373,7 +371,6 @@ function RatingModal({ open, onClose, pedido, onSaved }) {
           </div>
         </div>
 
-        {/* Footer */}
         <div style={{
           padding:14, borderTop:'1px solid #e5e7eb',
           display:'flex', justifyContent:'flex-end', gap:10
@@ -411,7 +408,7 @@ const btn = (bg, fg, enabled=true) => ({
 const ui = {
   filters: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', // 👈 se auto-ajusta
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
     gap: 12,
     background: '#fff',
     border: '1px solid #e5e7eb',
@@ -424,7 +421,7 @@ const ui = {
   label: { fontSize: 12, color: '#475569' },
   control: {
     width: '100%',
-    height: 44,            // 👈 misma altura para inputs y selects
+    height: 44,
     padding: '0 12px',
     border: '1px solid #e5e7eb',
     borderRadius: 12,
@@ -564,7 +561,7 @@ export default function Historial(){
     setRatingOpen(true);
   };
 
-  /* ===== Filtros en memoria (sin botón Buscar) ===== */
+  /* ===== Filtros en memoria ===== */
   const filtered = useMemo(()=>{
     const min = (from ? new Date(from+'T00:00:00') : null);
     const max = (to ? new Date(to+'T23:59:59.999') : null);
@@ -602,7 +599,7 @@ export default function Historial(){
 
   return (
     <div style={{ maxWidth: 980 }}>
-      {/* Título + resumen sobrio (sin badge azul) */}
+      {/* Título + resumen */}
       <div style={{ marginBottom:10 }}>
         <h1 style={{ margin:0 }}>🧾 Historial de pedidos</h1>
         <div style={{ color:'#475569', marginTop:6 }}>
@@ -611,57 +608,57 @@ export default function Historial(){
         </div>
       </div>
 
-      {/* Filtros (responsivos) */}
-<div style={ui.filters}>
-  <div style={ui.field}>
-    <label style={ui.label}>Desde</label>
-    <input
-      type="date"
-      value={from || ''}
-      onChange={(e) => setFrom(e.target.value)}
-      style={ui.control}
-    />
-  </div>
+      {/* Filtros */}
+      <div style={ui.filters}>
+        <div style={ui.field}>
+          <label style={ui.label}>Desde</label>
+          <input
+            type="date"
+            value={from || ''}
+            onChange={(e) => setFrom(e.target.value)}
+            style={ui.control}
+          />
+        </div>
 
-  <div style={ui.field}>
-    <label style={ui.label}>Hasta</label>
-    <input
-      type="date"
-      value={to || ''}
-      onChange={(e) => setTo(e.target.value)}
-      style={ui.control}
-    />
-  </div>
+        <div style={ui.field}>
+          <label style={ui.label}>Hasta</label>
+          <input
+            type="date"
+            value={to || ''}
+            onChange={(e) => setTo(e.target.value)}
+            style={ui.control}
+          />
+        </div>
 
-  <div style={ui.field}>
-    <label style={ui.label}>Estado</label>
-    <select
-      value={estado}
-      onChange={(e) => setEstado(e.target.value)}
-      style={ui.control}
-    >
-      <option value="">Todos</option>
-      <option value="PENDIENTE">Pendiente</option>
-      <option value="EN_PREPARACION">En preparación</option>
-      <option value="LISTO_PARA_RECOGER">Listo para recoger</option>
-      <option value="ENTREGADO">Entregado</option>
-      <option value="CANCELADA">Cancelada</option>
-    </select>
-  </div>
+        <div style={ui.field}>
+          <label style={ui.label}>Estado</label>
+          <select
+            value={estado}
+            onChange={(e) => setEstado(e.target.value)}
+            style={ui.control}
+          >
+            <option value="">Todos</option>
+            <option value="PENDIENTE">Pendiente</option>
+            <option value="EN_PREPARACION">En preparación</option>
+            <option value="LISTO_PARA_RECOGER">Listo para recoger</option>
+            <option value="ENTREGADO">Entregado</option>
+            <option value="CANCELADA">Cancelada</option>
+          </select>
+        </div>
 
-  <div style={ui.field}>
-    <label style={ui.label}>Entrega</label>
-    <select
-      value={tipoEntrega}
-      onChange={(e) => setTipoEntrega(e.target.value)}
-      style={ui.control}
-    >
-      <option value="">Todas</option>
-      <option value="LOCAL">Local</option>
-      <option value="DOMICILIO">Domicilio</option>
-    </select>
-  </div>
-</div>
+        <div style={ui.field}>
+          <label style={ui.label}>Entrega</label>
+          <select
+            value={tipoEntrega}
+            onChange={(e) => setTipoEntrega(e.target.value)}
+            style={ui.control}
+          >
+            <option value="">Todas</option>
+            <option value="LOCAL">Local</option>
+            <option value="DOMICILIO">Domicilio</option>
+          </select>
+        </div>
+      </div>
 
       {/* Lista */}
       {loading ? (
