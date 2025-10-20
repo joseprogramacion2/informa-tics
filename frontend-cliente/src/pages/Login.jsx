@@ -1,22 +1,29 @@
-// frontend/src/pages/LoginCliente.jsx
 import React, { useEffect, useState } from "react";
 import { auth, googleProvider } from "../firebaseCliente";
-import { signInWithPopup, signInWithRedirect, getRedirectResult, getIdToken } from "firebase/auth";
-import api from "../api"; // 👈 usa la instancia con baseURL (no localhost)
+import {
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  getIdToken,
+} from "firebase/auth";
+import api from "../api"; // Usa la instancia con baseURL de producción
 
 export default function LoginCliente() {
   const [loading, setLoading] = useState(false);
 
-  // Maneja el retorno de signInWithRedirect (en móviles)
+  /* ==========================================================
+     🔁 Maneja el retorno del login con redirect (en móviles)
+  ========================================================== */
   useEffect(() => {
     (async () => {
       try {
         const result = await getRedirectResult(auth);
         if (result?.user) {
           const idToken = await getIdToken(result.user, true);
+          const email = result.user?.email || "";
           const res = await api.post(
             "/auth/google-cliente",
-            {},
+            { email }, // ✅ envía el email como respaldo
             { headers: { Authorization: `Bearer ${idToken}` } }
           );
           localStorage.setItem("usuario", JSON.stringify(res.data.usuario));
@@ -28,26 +35,30 @@ export default function LoginCliente() {
     })();
   }, []);
 
+  /* ==========================================================
+     🔐 Iniciar sesión con Google (popup / fallback redirect)
+  ========================================================== */
   const handleGoogleLogin = async () => {
     try {
       setLoading(true);
 
-      // 1) Intentar popup primero (rápido en desktop)
+      // 1️⃣ Intentar popup (rápido en desktop)
       try {
         const result = await signInWithPopup(auth, googleProvider);
         const idToken = await getIdToken(result.user, true);
+        const email = result.user?.email || "";
 
         const res = await api.post(
           "/auth/google-cliente",
-          {},
+          { email }, // ✅ se envía el correo en el body
           { headers: { Authorization: `Bearer ${idToken}` } }
         );
 
         localStorage.setItem("usuario", JSON.stringify(res.data.usuario));
         window.location.replace("/cliente/home");
-        return; // listo
+        return; // 🔚 listo
       } catch (popupErr) {
-        // 2) Fallback a redirect en móviles o si el popup fue bloqueado/no soportado
+        // 2️⃣ Fallback redirect (para móviles o bloqueos de popup)
         const code = popupErr?.code || "";
         const fallbackCodes = [
           "auth/operation-not-supported-in-this-environment",
@@ -55,11 +66,7 @@ export default function LoginCliente() {
           "auth/popup-closed-by-user",
           "auth/cancelled-popup-request",
         ];
-        if (!fallbackCodes.includes(code)) {
-          // Si fue otro error “real” (credenciales, etc.), lánzalo
-          throw popupErr;
-        }
-        // Redirige (flujo full-screen compatible con móviles / in-app browsers)
+        if (!fallbackCodes.includes(code)) throw popupErr;
         await signInWithRedirect(auth, googleProvider);
       }
     } catch (e) {
@@ -70,7 +77,9 @@ export default function LoginCliente() {
     }
   };
 
-  // ===== estilos inline (idénticos a los tuyos) =====
+  /* ==========================================================
+     🎨 Estilos inline (manteniendo tu diseño original)
+  ========================================================== */
   const page = {
     minHeight: "100vh",
     display: "grid",
@@ -158,10 +167,13 @@ export default function LoginCliente() {
     borderRadius: 999,
   };
 
+  /* ==========================================================
+     🧱 JSX render
+  ========================================================== */
   return (
     <div style={page}>
       <div style={card}>
-        {/* Encabezado / marca */}
+        {/* ====== Encabezado / Marca ====== */}
         <div style={header}>
           <div style={brandRow}>
             <div style={brandIcon}>🍽️</div>
@@ -182,33 +194,44 @@ export default function LoginCliente() {
           </div>
         </div>
 
-        {/* Cuerpo / botón Google */}
+        {/* ====== Cuerpo / Botón Google ====== */}
         <div style={body}>
           <button
             onClick={handleGoogleLogin}
             disabled={loading}
             style={btn(loading)}
-            onMouseDown={(e) => { if (!loading) e.currentTarget.style.transform = "scale(.98)"; }}
-            onMouseUp={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+            onMouseDown={(e) => {
+              if (!loading) e.currentTarget.style.transform = "scale(.98)";
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.transform = "scale(1)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "scale(1)";
+            }}
             aria-label="Continuar con Google"
           >
             <img
               style={googleIcon}
               src="https://www.svgrepo.com/show/355037/google.svg"
-              alt=""
+              alt="icon"
             />
             {loading ? "Conectando…" : "Continuar con Google"}
           </button>
         </div>
 
-        {/* Pie / ayuda y legal */}
+        {/* ====== Pie / Avisos ====== */}
         <div style={foot}>
           <div style={{ marginTop: 6 }}>
             Al continuar aceptas nuestra{" "}
-            <a href="#" style={link}>Política de Privacidad</a> y{" "}
-            <a href="#" style={link}>Términos y Condiciones</a>.
-            No compartimos tu contraseña con el restaurante.
+            <a href="#" style={link}>
+              Política de Privacidad
+            </a>{" "}
+            y{" "}
+            <a href="#" style={link}>
+              Términos y Condiciones
+            </a>
+            . No compartimos tu contraseña con el restaurante.
           </div>
         </div>
       </div>

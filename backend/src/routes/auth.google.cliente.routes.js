@@ -17,59 +17,55 @@ function normalizePerms(list) {
     .map(normPermKey);
 }
 
+// ==================== LOGIN GOOGLE CLIENTE ==================== //
 router.post("/google-cliente", verifyFirebase, async (req, res) => {
   try {
-    const fUser = req.firebaseUser;
-    const email = String(fUser?.email || "").toLowerCase();
-    const nombreGoogle = fUser?.name || email.split("@")[0] || "Cliente";
-    if (!email) return res.status(400).json({ error: "El token no trae email" });
+    const fUser = req.firebaseUser || req.user || {};
+    const emailFromToken = (fUser.email || "").toLowerCase();
+    const emailFromBody  = (req.body?.email || "").toLowerCase();
+    const email = emailFromToken || emailFromBody;
 
-    // 1) Asegurar rol Cliente
+    if (!email) return res.status(400).json({ error: "No hay email (token/body)" });
+
+    const nombreGoogle = fUser.name || email.split("@")[0] || "Cliente";
+
+    // 1️⃣ Asegurar rol Cliente
     let rolCliente = await prisma.rol.findFirst({ where: { nombre: "Cliente" } });
     if (!rolCliente) rolCliente = await prisma.rol.create({ data: { nombre: "Cliente" } });
 
-    // 2) Buscar usuario por correo (case-insensitive)
+    // 2️⃣ Buscar usuario existente
     const existente = await prisma.usuario.findFirst({
       where: { correo: { equals: email, mode: "insensitive" } },
       include: { rol: true },
     });
 
     let usuario;
-
     if (existente) {
       const esCliente = existente.rol?.nombre?.toLowerCase() === "cliente";
-
       if (esCliente) {
-        // Usuario ya es Cliente -> se puede sincronizar nombre/usuario si quieres
         usuario = await prisma.usuario.update({
           where: { id: existente.id },
           data: {
             nombre: nombreGoogle,
-            usuario: existente.usuario || email, // si estaba vacío, usa el email
+            usuario: existente.usuario || email,
             estado: true,
             debeCambiarPassword: false,
           },
           include: { rol: true },
         });
       } else {
-        // Staff (Bartender/Mesero/Admin/etc) -> NO tocar nombre ni usuario
         usuario = await prisma.usuario.update({
           where: { id: existente.id },
-          data: {
-            // nombre: existente.nombre,
-            // usuario: existente.usuario,
-            estado: true,
-            debeCambiarPassword: false,
-          },
+          data: { estado: true, debeCambiarPassword: false },
           include: { rol: true },
         });
       }
     } else {
-      // 3) No existe -> crear como Cliente
+      // 3️⃣ Crear nuevo cliente
       usuario = await prisma.usuario.create({
         data: {
           nombre: nombreGoogle,
-          usuario: email,       // para clientes nuevos sí usamos el email como user
+          usuario: email,
           correo: email,
           contrasena: null,
           rolId: rolCliente.id,
@@ -80,7 +76,7 @@ router.post("/google-cliente", verifyFirebase, async (req, res) => {
       });
     }
 
-    // 4) Permisos por rol
+    // 4️⃣ Permisos por rol
     const rolId = usuario.rolId || usuario.rol?.id;
     const links = await prisma.permisoPorRol.findMany({
       where: { rolId },

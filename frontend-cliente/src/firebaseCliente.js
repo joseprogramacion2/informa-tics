@@ -14,3 +14,5 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope("email"); // 👈 Asegura que siempre incluya el correo
+
