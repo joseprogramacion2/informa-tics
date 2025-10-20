@@ -40,6 +40,25 @@ function tipoPorCategoria(p) {
   return safeCategoriaTipo(p) === 'BEBIBLE' ? 'BEBIDA' : 'PLATILLO';
 }
 
+/* ======= Hook: detectar modo compacto (tablet/phone) ======= */
+function useCompact(breakpoint = 1100) {
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const mql = window.matchMedia(`(max-width:${breakpoint}px)`);
+    const on = () => setCompact(mql.matches);
+    on();
+    try {
+      mql.addEventListener('change', on);
+      return () => mql.removeEventListener('change', on);
+    } catch {
+      // Safari viejo
+      mql.addListener(on);
+      return () => mql.removeListener(on);
+    }
+  }, [breakpoint]);
+  return compact;
+}
+
 /* ============ Modal de Confirmación ============ */
 function ConfirmarEnvioModal({
   open,
@@ -127,6 +146,10 @@ function ConfirmarEnvioModal({
 
 /* ============ Vista principal ============ */
 export default function VistaMesero() {
+  const isCompact = useCompact(1100);
+  const [showCats, setShowCats] = useState(false);
+  const [showCart, setShowCart] = useState(false);
+
   const [categorias, setCategorias] = useState([]);
   const [platillos, setPlatillos] = useState([]);
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
@@ -176,7 +199,7 @@ export default function VistaMesero() {
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
-    setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 3000);
+    setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 2800);
   };
 
   useEffect(() => {
@@ -333,6 +356,8 @@ export default function VistaMesero() {
         { uid: makeUid(), id: p.id, nombre: p.nombre, precio: p.precio, nota: '', cantidad: 1, tipo },
       ];
     });
+    // ✅ Feedback claro al usuario (PC/tablet)
+    showToast(`Agregado: ${p.nombre}`, 'success');
   };
 
   const agregarConNota = (p, tipo = 'PLATILLO') => {
@@ -362,6 +387,7 @@ export default function VistaMesero() {
       },
     ]);
     setMostrarNotas(false);
+    showToast(`Agregado: ${platilloActual.nombre}${notaLimpia ? ` (nota)` : ''}`, 'success'); // ✅ feedback
     setPlatilloActual(null);
     setNotaTemporal('');
   };
@@ -586,7 +612,7 @@ export default function VistaMesero() {
     navigate('/mesero/ordenes');
   };
 
-  // ===== UI =====
+  /* =================== UI =================== */
   return (
     <div
       style={{
@@ -600,39 +626,69 @@ export default function VistaMesero() {
     >
       <PageTopBar title={ordenEditId ? 'Editar Orden' : 'Generar Orden'} backTo="/panel" />
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%', boxSizing: 'border-box' }}>
-        {/* Sidebar IZQ: Categorías */}
-        <div style={{ flex: '0 0 260px', padding: '1rem', borderRight: '2px solid #ccc', overflowY: 'auto' }}>
-          <h2 style={{ fontSize: '1.2rem' }}>Categorías</h2>
-          {categorias.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setCategoriaSeleccionada(cat.id)}
-              style={{
-                display: 'block',
-                width: '100%',
-                marginBottom: '.8rem',
-                padding: '.6rem',
-                fontSize: '1rem',
-                backgroundColor: categoriaSeleccionada === cat.id ? '#004d4d' : '#eee',
-                color: categoriaSeleccionada === cat.id ? '#fff' : '#000',
-                border: 'none',
-                borderRadius: 8,
-                cursor: 'pointer',
-              }}
-            >
-              {cat.nombre}
-            </button>
-          ))}
-          {!ordenEditId && (
-            <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
-              {mustSelectMesa ? 'Selecciona una mesa para comenzar.' : ``}
-            </div>
-          )}
+      {/* Barra de acciones compactas (solo cuando isCompact) */}
+      {isCompact && (
+        <div style={{
+          display: 'flex',
+          gap: 8,
+          padding: '8px 10px',
+          borderBottom: '1px solid #e5e7eb',
+          background: '#fff',
+          position: 'sticky',
+          top: 48, // aprox alto de PageTopBar
+          zIndex: 4
+        }}>
+          <button onClick={() => setShowCats(true)} style={btnGhost}>☰ Categorías</button>
+          <button onClick={() => setShowCart(true)} style={btnConfirm}>
+            🧺 Ver pedido {carrito.length > 0 ? `· Q${totalCarrito.toFixed(2)}` : ''}
+          </button>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <strong>Mesa:</strong>
+            {mesaSeleccionada ? <span style={chipMesa}>#{mesaSeleccionada}</span> : <span style={{ color: '#b91c1c', fontWeight: 700 }}>Selecciona</span>}
+            {!ordenEditId && (
+              <button onClick={() => setMostrarMesaModal(true)} style={btnGhost}>
+                Cambiar
+              </button>
+            )}
+          </div>
         </div>
+      )}
 
-        {/* Centro: Platillos */}
-        <div style={{ flex: '1 1 auto', minWidth: 0, padding: '1rem', overflowY: 'auto' }}>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%', boxSizing: 'border-box' }}>
+        {/* Sidebar IZQ: Categorías (escritorio) */}
+        {!isCompact && (
+          <div style={{ flex: '0 0 260px', padding: '1rem', borderRight: '2px solid #ccc', overflowY: 'auto', WebkitOverflowScrolling:'touch', touchAction:'pan-y' }}>
+            <h2 style={{ fontSize: '1.2rem' }}>Categorías</h2>
+            {categorias.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setCategoriaSeleccionada(cat.id)}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  marginBottom: '.8rem',
+                  padding: '.6rem',
+                  fontSize: '1rem',
+                  backgroundColor: categoriaSeleccionada === cat.id ? '#004d4d' : '#eee',
+                  color: categoriaSeleccionada === cat.id ? '#fff' : '#000',
+                  border: 'none',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                }}
+              >
+                {cat.nombre}
+              </button>
+            ))}
+            {!ordenEditId && (
+              <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
+                {mustSelectMesa ? 'Selecciona una mesa para comenzar.' : ``}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Centro: Platillos (siempre visible) */}
+        <div style={{ flex: '1 1 auto', minWidth: 0, padding: '1rem', overflowY: 'auto', WebkitOverflowScrolling:'touch', touchAction:'pan-y', overscrollBehavior:'contain' }}>
           {ordenEditId && (
             <div
               style={{
@@ -671,22 +727,20 @@ export default function VistaMesero() {
               .map((p) => (
                 <div
                   key={p.id}
-                  draggable={!mustSelectMesa}
+                  draggable={!mustSelectMesa && !isCompact} // en móvil/tablet suele no usar DnD
                   onDragStart={onDragStart(p)}
                   style={{
                     background: '#fff',
                     padding: '1rem',
                     borderRadius: 10,
                     boxShadow: '0 2px 6px rgba(0,0,0,.1)',
-                    cursor: mustSelectMesa ? 'not-allowed' : 'grab',
+                    cursor: mustSelectMesa ? 'not-allowed' : (!isCompact ? 'grab' : 'default'),
                   }}
                 >
                   <img
                     src={p.imagenUrl || FALLBACK_IMG}
                     alt={p.nombre}
-                    onError={(e) => {
-                      e.currentTarget.src = FALLBACK_IMG;
-                    }}
+                    onError={(e) => { e.currentTarget.src = FALLBACK_IMG; }}
                     style={{
                       width: '100%',
                       height: 140,
@@ -717,23 +771,131 @@ export default function VistaMesero() {
           </div>
         </div>
 
-        {/* Derecha: pedido */}
-        <div style={{ flex: '0 0 480px', padding: '0', borderLeft: '2px solid #ccc', background: '#fff', display: 'flex', flexDirection: 'column' }}>
-          {/* Header sticky */}
-          <div
-            style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 5,
-              background: '#fff',
-              borderBottom: '1px solid #e5e7eb',
-              padding: '0.8rem 1rem',
-              display: 'grid',
-              gridTemplateColumns: '1fr auto',
-              gap: 10,
-              alignItems: 'center',
-            }}
-          >
+        {/* Derecha: pedido (escritorio) */}
+        {!isCompact && (
+          <div style={{ flex: '0 0 480px', padding: '0', borderLeft: '2px solid #ccc', background: '#fff', display: 'flex', flexDirection: 'column' }}>
+            {/* Header sticky */}
+            <div
+              style={{
+                position: 'sticky',
+                top: 0,
+                zIndex: 5,
+                background: '#fff',
+                borderBottom: '1px solid #e5e7eb',
+                padding: '0.8rem 1rem',
+                display: 'grid',
+                gridTemplateColumns: '1fr auto',
+                gap: 10,
+                alignItems: 'center',
+              }}
+            >
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                {ordenEditId ? (
+                  <strong>Modo edición</strong>
+                ) : (
+                  <>
+                    <strong>Mesa:</strong>
+                    {mesaSeleccionada ? <span style={chipMesa}>#{mesaSeleccionada}</span> : <span style={{ color: '#b91c1c', fontWeight: 700 }}>Selecciona una mesa</span>}
+                    <span style={{ marginLeft: 8, color: '#334155', fontWeight: 700 }}>Total: Q{totalCarrito.toFixed(2)}</span>
+
+                    {/* Aviso compacto en header cuando hay mínimos por reserva */}
+                    {!ordenEditId && mesaSeleccionada && esClienteReservo && (minR > 0 || minQ > 0) && (
+                      <span
+                        style={{
+                          marginLeft: 8,
+                          background: '#fffbeb',
+                          border: '1px solid #fcd34d',
+                          color: '#92400e',
+                          padding: '2px 8px',
+                          borderRadius: 8,
+                          fontSize: 12,
+                          fontWeight: 700,
+                        }}
+                        title="Mesa reservada con mínimos"
+                      >
+                        Mesa reservada: {minQ > 0 ? `min. Q${minQ.toFixed(2)}` : ''}{minQ > 0 && minR > 0 ? ' · ' : ''}{minR > 0 ? `min. ${minR} plat.` : ''}
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                {ordenEditId ? (
+                  <>
+                    <button onClick={salirSinCambios} style={btnGhost}>Salir sin cambios</button>
+                    <button onClick={guardarCambios} style={btnConfirm}>Guardar cambios</button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => {
+                      if (disableEnviar) return;
+                      setShowConfirmSend(true);
+                    }}
+                    disabled={disableEnviar}
+                    title={disableEnviar ? motivoDisable : 'Enviar orden a cocina/barra'}
+                    style={{
+                      ...btnConfirm,
+                      opacity: disableEnviar ? 0.6 : 1,
+                      cursor: disableEnviar ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {mesaSeleccionada ? 'Enviar Orden' : 'Seleccionar mesa'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Cuerpo */}
+            <RightPanelBody
+              {...{
+                ordenEditId, existentes, deleteIds, updatesNota,
+                puedeEditarNota, puedeEliminarItem, abrirEditarNota, toggleEliminarExistente,
+                mustSelectMesa, carrito, incPorUid, decPorUid, eliminarPorUid, moverATipo,
+                totalCarrito, minR, minQ, countPlatillosNuevos, esClienteReservo,
+                allowDrop, onDropEn
+              }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* ======= Drawers en modo compacto ======= */}
+      {isCompact && showCats && (
+        <Drawer side="left" onClose={() => setShowCats(false)}>
+          <h3 style={{ marginTop: 0 }}>Categorías</h3>
+          {categorias.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => { setCategoriaSeleccionada(cat.id); setShowCats(false); }}
+              style={{
+                display: 'block',
+                width: '100%',
+                marginBottom: '.8rem',
+                padding: '.6rem',
+                fontSize: '1rem',
+                backgroundColor: categoriaSeleccionada === cat.id ? '#004d4d' : '#eee',
+                color: categoriaSeleccionada === cat.id ? '#fff' : '#000',
+                border: 'none',
+                borderRadius: 8,
+                cursor: 'pointer',
+              }}
+            >
+              {cat.nombre}
+            </button>
+          ))}
+          {!ordenEditId && (
+            <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
+              {mustSelectMesa ? 'Selecciona una mesa para comenzar.' : ``}
+            </div>
+          )}
+        </Drawer>
+      )}
+
+      {isCompact && showCart && (
+        <Drawer side="right" onClose={() => setShowCart(false)} width={Math.min(520, Math.floor(window.innerWidth * 0.92))}>
+          {/* Header compacto del pedido */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center', marginBottom: 8 }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               {ordenEditId ? (
                 <strong>Modo edición</strong>
@@ -742,34 +904,14 @@ export default function VistaMesero() {
                   <strong>Mesa:</strong>
                   {mesaSeleccionada ? <span style={chipMesa}>#{mesaSeleccionada}</span> : <span style={{ color: '#b91c1c', fontWeight: 700 }}>Selecciona una mesa</span>}
                   <span style={{ marginLeft: 8, color: '#334155', fontWeight: 700 }}>Total: Q{totalCarrito.toFixed(2)}</span>
-
-                  {/* Aviso compacto en header cuando hay mínimos por reserva */}
-                  {!ordenEditId && mesaSeleccionada && esClienteReservo && (minR > 0 || minQ > 0) && (
-                    <span
-                      style={{
-                        marginLeft: 8,
-                        background: '#fffbeb',
-                        border: '1px solid #fcd34d',
-                        color: '#92400e',
-                        padding: '2px 8px',
-                        borderRadius: 8,
-                        fontSize: 12,
-                        fontWeight: 700,
-                      }}
-                      title="Mesa reservada con mínimos"
-                    >
-                      Mesa reservada: {minQ > 0 ? `min. Q${minQ.toFixed(2)}` : ''}{minQ > 0 && minR > 0 ? ' · ' : ''}{minR > 0 ? `min. ${minR} plat.` : ''}
-                    </span>
-                  )}
                 </>
               )}
             </div>
-
             <div style={{ display: 'flex', gap: 8 }}>
               {ordenEditId ? (
                 <>
-                  <button onClick={salirSinCambios} style={btnGhost}>Salir sin cambios</button>
-                  <button onClick={guardarCambios} style={btnConfirm}>Guardar cambios</button>
+                  <button onClick={salirSinCambios} style={btnGhost}>Salir</button>
+                  <button onClick={async () => { await guardarCambios(); setShowCart(false); }} style={btnConfirm}>Guardar</button>
                 </>
               ) : (
                 <button
@@ -785,237 +927,24 @@ export default function VistaMesero() {
                     cursor: disableEnviar ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  {mesaSeleccionada ? 'Enviar Orden' : 'Seleccionar mesa'}
+                  Enviar
                 </button>
               )}
             </div>
           </div>
 
-          {/* Cuerpo */}
-          <div style={{ padding: '1rem', overflowY: 'auto', display: 'grid', gap: 16 }}>
-            {/* Banner descriptivo de mínimos en el panel derecho */}
-            {!ordenEditId && mesaSeleccionada && esClienteReservo && (minR > 0 || minQ > 0) && (
-              <div
-                style={{
-                  background: '#fff7ed',
-                  border: '1px solid #fed7aa',
-                  color: '#92400e',
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                }}
-              >
-                Mesa reservada:
-                {minQ > 0 ? <> mínimo <b>Q{minQ.toFixed(2)}</b> {minQ > 0 ? `(actual: Q${totalCarrito.toFixed(2)})` : ''}</> : null}
-                {minR > 0 ? <> {minQ > 0 ? 'y ' : ''}<b>{minR}</b> platillo(s) {minR > 0 ? `(actual: ${countPlatillosNuevos})` : ''}</> : null}.
-              </div>
-            )}
-
-            {/* EXISTENTES */}
-            {ordenEditId && (
-              <section style={section}>
-                <h3 style={{ marginTop: 0 }}>Ya en la orden</h3>
-                {existentes.length === 0 ? (
-                  <div style={emptyBox}>Sin ítems previos.</div>
-                ) : (
-                  <div style={{ display: 'grid', gap: 8 }}>
-                    {existentes.map((it) => {
-                      const canEdit   = puedeEditarNota(it);
-                      const canDelete = puedeEliminarItem(it);
-                      const marcado   = deleteIds.has(it.id);
-                      const editado   = updatesNota.has(it.id);
-
-                      return (
-                        <div
-                          key={it.id}
-                          style={{
-                            padding: '10px 12px',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: 8,
-                            background: marcado ? '#fee2e2' : '#f8fafc',
-                            opacity: (!canEdit && !canDelete) ? 0.8 : 1,
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                            <div style={{ flex: 1 }}>
-                              <strong>{it.nombre}</strong> • Q{Number(it.precio).toFixed(2)} • {it.tipo}
-                              {it.nota ? (
-                                <div style={{ fontSize: 13, color: '#6b7280' }}>
-                                  <em>Nota: {it.nota}</em> {editado && <span style={{ marginLeft: 6, fontWeight: 700, color: '#0f766e' }}>(editada)</span>}
-                                </div>
-                              ) : (
-                                <div style={{ fontSize: 13, color: '#6b7280' }}>
-                                  <em>Sin nota</em> {editado && <span style={{ marginLeft: 6, fontWeight: 700, color: '#0f766e' }}>(agregada)</span>}
-                                </div>
-                              )}
-                              <div style={{ fontSize: 12, color: '#6b7280' }}>
-                                Estado: {it.estado}
-                                {it.chefId ? ` • Chef ${it.chefId}` : ''}
-                              </div>
-                            </div>
-                            <div style={{ display: 'flex', gap: 8 }}>
-                              <button
-                                disabled={!canEdit}
-                                onClick={() => abrirEditarNota(it)}
-                                style={{
-                                  padding: '.4rem .7rem',
-                                  borderRadius: 6,
-                                  border: '1px solid #94a3b8',
-                                  background: '#fff',
-                                  color: '#0f172a',
-                                  cursor: !canEdit ? 'not-allowed' : 'pointer',
-                                  fontWeight: 700,
-                                }}
-                                title={!canEdit ? 'No se puede editar nota (ya en cocina o entregado)' : 'Editar nota'}
-                              >
-                                Editar nota
-                              </button>
-
-                              <button
-                                disabled={!canDelete}
-                                onClick={() => toggleEliminarExistente(it.id)}
-                                style={{
-                                  padding: '.4rem .7rem',
-                                  border: 'none',
-                                  cursor: !canDelete ? 'not-allowed' : 'pointer',
-                                  background: marcado ? '#991b1b' : '#ef4444',
-                                  color: '#fff',
-                                  fontWeight: 700,
-                                }}
-                                title={
-                                  !canDelete
-                                    ? 'No se puede eliminar (solo PENDIENTE o ASIGNADO)'
-                                    : (marcado ? 'Deshacer' : 'Marcar para eliminar')
-                                }
-                              >
-                                {marcado ? 'Deshacer' : 'Eliminar'}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                <div style={{ marginTop: 6, fontSize: 13, color: '#64748b' }}>
-                  * Reglas: solo se puede <b>eliminar</b> ítems en <b>PENDIENTE</b> o <b>ASIGNADO</b>. Puedes <b>agregar</b> nuevos ítems aunque haya ítems en preparación o listos.
-                </div>
-              </section>
-            )}
-
-            {/* NUEVOS */}
-            <section style={section}>
-              <h3 style={{ marginTop: 0 }}>{ordenEditId ? 'Nuevos a agregar' : 'Pedido'}</h3>
-
-              {/* Zona platillos */}
-              <div
-                onDragOver={allowDrop}
-                onDrop={onDropEn('PLATILLO')}
-                style={{
-                  background: '#f1f5f9',
-                  border: '2px dashed #0f766e',
-                  minHeight: 120,
-                  borderRadius: 10,
-                  padding: 10,
-                  marginBottom: 12,
-                  ...(mustSelectMesa ? { opacity: 0.6 } : {}),
-                }}
-              >
-                <h4 style={{ marginTop: 0 }}>🍽️ Platillos (para cocina)</h4>
-                {carrito.filter((i) => i.tipo === 'PLATILLO').length === 0 &&
-                (!ordenEditId || existentes.filter((i) => i.tipo === 'PLATILLO').length === 0) ? (
-                  <p style={{ margin: 0, color: '#64748b' }}>{mustSelectMesa ? 'Selecciona una mesa para empezar.' : 'Arrastra aquí o usa “Agregar”.'}</p>
-                ) : null}
-
-                {carrito
-                  .filter((i) => i.tipo === 'PLATILLO')
-                  .map((item) => {
-                    const cant = item.cantidad || 1;
-                    const sub = item.precio * cant;
-                    return (
-                      <div key={item.uid} style={{ marginBottom: '0.6rem', background: '#e2e8f0', padding: '0.6rem', borderRadius: 8 }}>
-                        <strong>
-                          {item.nombre}
-                          {cant > 1 ? ` x${cant}` : ''}
-                        </strong>
-                        <div>
-                          Q{item.precio.toFixed(2)}
-                          {cant > 1 ? ` • Subtotal: Q${sub.toFixed(2)}` : ''}
-                        </div>
-                        {item.nota && (
-                          <div>
-                            <em>Nota: {item.nota}</em>
-                          </div>
-                        )}
-                        <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                          <button onClick={() => incPorUid(item.uid)}>+1</button>
-                          <button onClick={() => decPorUid(item.uid)}>-1</button>
-                          <button onClick={() => eliminarPorUid(item.uid)} style={{ background: '#e11d48', color: '#fff', border: 'none', borderRadius: 4, padding: '.2rem .5rem' }}>
-                            Eliminar
-                          </button>
-                          <button onClick={() => moverATipo(item.uid, 'BEBIDA')}>→ Bebidas</button>
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-
-              {/* Zona bebidas */}
-              <div
-                onDragOver={allowDrop}
-                onDrop={onDropEn('BEBIDA')}
-                style={{
-                  background: '#fef3c7',
-                  border: '2px dashed #ea580c',
-                  minHeight: 120,
-                  borderRadius: 10,
-                  padding: 10,
-                  ...(mustSelectMesa ? { opacity: 0.6 } : {}),
-                }}
-              >
-                <h4 style={{ marginTop: 0 }}>🥤 Bebidas (para barra)</h4>
-                {carrito.filter((i) => i.tipo === 'BEBIDA').length === 0 &&
-                (!ordenEditId || existentes.filter((i) => i.tipo === 'BEBIDA').length === 0) ? (
-                  <p style={{ margin: 0, color: '#a16207' }}>{mustSelectMesa ? 'Selecciona una mesa para empezar.' : 'Arrastra aquí si es bebida.'}</p>
-                ) : null}
-
-                {carrito
-                  .filter((i) => i.tipo === 'BEBIDA')
-                  .map((item) => {
-                    const cant = item.cantidad || 1;
-                    const sub = item.precio * cant;
-                    return (
-                      <div key={item.uid} style={{ marginBottom: '0.6rem', background: '#fde68a', padding: '0.6rem', borderRadius: 8 }}>
-                        <strong>
-                          {item.nombre}
-                          {cant > 1 ? ` x${cant}` : ''}
-                        </strong>
-                        <div>
-                          Q{item.precio.toFixed(2)}
-                          {cant > 1 ? ` • Subtotal: Q${sub.toFixed(2)}` : ''}
-                        </div>
-                        {item.nota && (
-                          <div>
-                            <em>Nota: {item.nota}</em>
-                          </div>
-                        )}
-                        <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                          <button onClick={() => incPorUid(item.uid)}>+1</button>
-                          <button onClick={() => decPorUid(item.uid)}>-1</button>
-                          <button onClick={() => eliminarPorUid(item.uid)} style={{ background: '#e11d48', color: '#fff', border: 'none', borderRadius: 4, padding: '.2rem .5rem' }}>
-                            Eliminar
-                          </button>
-                          <button onClick={() => moverATipo(item.uid, 'PLATILLO')}>→ Platillos</button>
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-
-              {!ordenEditId && <div style={{ marginTop: 10, color: '#334155', fontWeight: 700 }}>Total nuevos: Q{totalCarrito.toFixed(2)}</div>}
-            </section>
-          </div>
-        </div>
-      </div>
+          {/* Cuerpo del panel derecho (reutilizamos componente) */}
+          <RightPanelBody
+            {...{
+              ordenEditId, existentes, deleteIds, updatesNota,
+              puedeEditarNota, puedeEliminarItem, abrirEditarNota, toggleEliminarExistente,
+              mustSelectMesa, carrito, incPorUid, decPorUid, eliminarPorUid, moverATipo,
+              totalCarrito, minR, minQ, countPlatillosNuevos, esClienteReservo,
+              allowDrop, onDropEn
+            }}
+          />
+        </Drawer>
+      )}
 
       {/* Toast */}
       <ToastMessage message={toast.message} type={toast.type} show={toast.show} onClose={() => setToast((prev) => ({ ...prev, show: false }))} />
@@ -1282,7 +1211,6 @@ export default function VistaMesero() {
               const minQ = Number(st?.minimoReserva || 0);
               setMinimoMesa(minR);      // personas
               setMinimoConsumo(minQ);   // Q
-              // 🔔 Toast inmediato con los mínimos (como en la 1a imagen)
               if (minR > 0 || minQ > 0) {
                 const parts = [];
                 if (minQ > 0) parts.push(`Q${minQ.toFixed(2)}`);
@@ -1317,6 +1245,266 @@ export default function VistaMesero() {
           await enviarNuevaOrden();
         }}
       />
+    </div>
+  );
+}
+
+/* ======= Subcomponentes reutilizables ======= */
+function Drawer({ side = 'right', width = Math.min(520, Math.floor(window.innerWidth * 0.92)), onClose, children }) {
+  const fromLeft = side === 'left';
+  return (
+    <div style={drawerOverlay} onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}>
+      <div
+        style={{
+          ...drawerPanel,
+          width,
+          [fromLeft ? 'left' : 'right']: 0,
+          transform: 'translateX(0)',
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
+          overscrollBehavior: 'contain',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} aria-label="Cerrar" style={btnClose}>×</button>
+        </div>
+        <div style={{ padding: '0 10px 14px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function RightPanelBody(props) {
+  const {
+    ordenEditId, existentes, deleteIds, updatesNota,
+    puedeEditarNota, puedeEliminarItem, abrirEditarNota, toggleEliminarExistente,
+    mustSelectMesa, carrito, incPorUid, decPorUid, eliminarPorUid, moverATipo,
+    totalCarrito, minR, minQ, countPlatillosNuevos, esClienteReservo,
+    allowDrop, onDropEn
+  } = props;
+
+  return (
+    <div style={{ padding: '1rem', overflowY: 'auto', WebkitOverflowScrolling:'touch', touchAction:'pan-y', overscrollBehavior:'contain', display: 'grid', gap: 16 }}>
+      {/* Banner descriptivo de mínimos en el panel derecho */}
+      {!ordenEditId && esClienteReservo && (minR > 0 || minQ > 0) && (
+        <div
+          style={{
+            background: '#fff7ed',
+            border: '1px solid #fed7aa',
+            color: '#92400e',
+            padding: '8px 12px',
+            borderRadius: 8,
+          }}
+        >
+          Mesa reservada:
+          {minQ > 0 ? <> mínimo <b>Q{minQ.toFixed(2)}</b> {minQ > 0 ? `(actual: Q${totalCarrito.toFixed(2)})` : ''}</> : null}
+          {minR > 0 ? <> {minQ > 0 ? 'y ' : ''}<b>{minR}</b> platillo(s) {minR > 0 ? `(actual: ${countPlatillosNuevos})` : ''}</> : null}.
+        </div>
+      )}
+
+      {/* EXISTENTES */}
+      {ordenEditId && (
+        <section style={section}>
+          <h3 style={{ marginTop: 0 }}>Ya en la orden</h3>
+          {existentes.length === 0 ? (
+            <div style={emptyBox}>Sin ítems previos.</div>
+          ) : (
+            <div style={{ display: 'grid', gap: 8 }}>
+              {existentes.map((it) => {
+                const canEdit   = puedeEditarNota(it);
+                const canDelete = puedeEliminarItem(it);
+                const marcado   = deleteIds.has(it.id);
+                const editado   = updatesNota.has(it.id);
+
+                return (
+                  <div
+                    key={it.id}
+                    style={{
+                      padding: '10px 12px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: 8,
+                      background: marcado ? '#fee2e2' : '#f8fafc',
+                      opacity: (!canEdit && !canDelete) ? 0.8 : 1,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                      <div style={{ flex: 1 }}>
+                        <strong>{it.nombre}</strong> • Q{Number(it.precio).toFixed(2)} • {it.tipo}
+                        {it.nota ? (
+                          <div style={{ fontSize: 13, color: '#6b7280' }}>
+                            <em>Nota: {it.nota}</em> {editado && <span style={{ marginLeft: 6, fontWeight: 700, color: '#0f766e' }}>(editada)</span>}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 13, color: '#6b7280' }}>
+                            <em>Sin nota</em> {editado && <span style={{ marginLeft: 6, fontWeight: 700, color: '#0f766e' }}>(agregada)</span>}
+                          </div>
+                        )}
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>
+                          Estado: {it.estado}
+                          {it.chefId ? ` • Chef ${it.chefId}` : ''}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          disabled={!canEdit}
+                          onClick={() => abrirEditarNota(it)}
+                          style={{
+                            padding: '.4rem .7rem',
+                            borderRadius: 6,
+                            border: '1px solid #94a3b8',
+                            background: '#fff',
+                            color: '#0f172a',
+                            cursor: !canEdit ? 'not-allowed' : 'pointer',
+                            fontWeight: 700,
+                          }}
+                          title={!canEdit ? 'No se puede editar nota (ya en cocina o entregado)' : 'Editar nota'}
+                        >
+                          Editar nota
+                        </button>
+
+                        <button
+                          disabled={!canDelete}
+                          onClick={() => toggleEliminarExistente(it.id)}
+                          style={{
+                            padding: '.4rem .7rem',
+                            border: 'none',
+                            cursor: !canDelete ? 'not-allowed' : 'pointer',
+                            background: marcado ? '#991b1b' : '#ef4444',
+                            color: '#fff',
+                            fontWeight: 700,
+                          }}
+                          title={
+                            !canDelete
+                              ? 'No se puede eliminar (solo PENDIENTE o ASIGNADO)'
+                              : (marcado ? 'Deshacer' : 'Marcar para eliminar')
+                          }
+                        >
+                          {marcado ? 'Deshacer' : 'Eliminar'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div style={{ marginTop: 6, fontSize: 13, color: '#64748b' }}>
+            * Reglas: solo se puede <b>eliminar</b> ítems en <b>PENDIENTE</b> o <b>ASIGNADO</b>. Puedes <b>agregar</b> nuevos ítems aunque haya ítems en preparación o listos.
+          </div>
+        </section>
+      )}
+
+      {/* NUEVOS */}
+      <section style={section}>
+        <h3 style={{ marginTop: 0 }}>{ordenEditId ? 'Nuevos a agregar' : 'Pedido'}</h3>
+
+        {/* Zona platillos */}
+        <div
+          onDragOver={allowDrop}
+          onDrop={onDropEn('PLATILLO')}
+          style={{
+            background: '#f1f5f9',
+            border: '2px dashed #0f766e',
+            minHeight: 120,
+            borderRadius: 10,
+            padding: 10,
+            marginBottom: 12,
+            ...(mustSelectMesa ? { opacity: 0.6 } : {}),
+          }}
+        >
+          <h4 style={{ marginTop: 0 }}>🍽️ Platillos (para cocina)</h4>
+          {carrito.filter((i) => i.tipo === 'PLATILLO').length === 0 &&
+          (!ordenEditId || existentes.filter((i) => i.tipo === 'PLATILLO').length === 0) ? (
+            <p style={{ margin: 0, color: '#64748b' }}>{mustSelectMesa ? 'Selecciona una mesa para empezar.' : 'Arrastra aquí o usa “Agregar”.'}</p>
+          ) : null}
+
+          {carrito
+            .filter((i) => i.tipo === 'PLATILLO')
+            .map((item) => {
+              const cant = item.cantidad || 1;
+              const sub = item.precio * cant;
+              return (
+                <div key={item.uid} style={{ marginBottom: '0.6rem', background: '#e2e8f0', padding: '0.6rem', borderRadius: 8 }}>
+                  <strong>
+                    {item.nombre}
+                    {cant > 1 ? ` x${cant}` : ''}
+                  </strong>
+                  <div>
+                    Q{item.precio.toFixed(2)}
+                    {cant > 1 ? ` • Subtotal: Q${sub.toFixed(2)}` : ''}
+                  </div>
+                  {item.nota && (
+                    <div>
+                      <em>Nota: {item.nota}</em>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                    <button onClick={() => incPorUid(item.uid)}>+1</button>
+                    <button onClick={() => decPorUid(item.uid)}>-1</button>
+                    <button onClick={() => eliminarPorUid(item.uid)} style={{ background: '#e11d48', color: '#fff', border: 'none', borderRadius: 4, padding: '.2rem .5rem' }}>
+                      Eliminar
+                    </button>
+                    <button onClick={() => moverATipo(item.uid, 'BEBIDA')}>→ Bebidas</button>
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+
+        {/* Zona bebidas */}
+        <div
+          onDragOver={allowDrop}
+          onDrop={onDropEn('BEBIDA')}
+          style={{
+            background: '#fef3c7',
+            border: '2px dashed #ea580c',
+            minHeight: 120,
+            borderRadius: 10,
+            padding: 10,
+            ...(mustSelectMesa ? { opacity: 0.6 } : {}),
+          }}
+        >
+          <h4 style={{ marginTop: 0 }}>🥤 Bebidas (para barra)</h4>
+          {carrito.filter((i) => i.tipo === 'BEBIDA').length === 0 &&
+          (!ordenEditId || existentes.filter((i) => i.tipo === 'BEBIDA').length === 0) ? (
+            <p style={{ margin: 0, color: '#a16207' }}>{mustSelectMesa ? 'Selecciona una mesa para empezar.' : 'Arrastra aquí si es bebida.'}</p>
+          ) : null}
+
+          {carrito
+            .filter((i) => i.tipo === 'BEBIDA')
+            .map((item) => {
+              const cant = item.cantidad || 1;
+              const sub = item.precio * cant;
+              return (
+                <div key={item.uid} style={{ marginBottom: '0.6rem', background: '#fde68a', padding: '0.6rem', borderRadius: 8 }}>
+                  <strong>
+                    {item.nombre}
+                    {cant > 1 ? ` x${cant}` : ''}
+                  </strong>
+                  <div>
+                    Q{item.precio.toFixed(2)}
+                    {cant > 1 ? ` • Subtotal: Q${sub.toFixed(2)}` : ''}
+                  </div>
+                  {item.nota && (
+                    <div>
+                      <em>Nota: {item.nota}</em>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                    <button onClick={() => incPorUid(item.uid)}>+1</button>
+                    <button onClick={() => decPorUid(item.uid)}>-1</button>
+                    <button onClick={() => eliminarPorUid(item.uid)} style={{ background: '#e11d48', color: '#fff', border: 'none', borderRadius: 4, padding: '.2rem .5rem' }}>
+                      Eliminar
+                    </button>
+                    <button onClick={() => moverATipo(item.uid, 'PLATILLO')}>→ Platillos</button>
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+
+        {!ordenEditId && <div style={{ marginTop: 10, color: '#334155', fontWeight: 700 }}>Total nuevos: Q{totalCarrito.toFixed(2)}</div>}
+      </section>
     </div>
   );
 }
@@ -1395,4 +1583,25 @@ const btnClose = {
   cursor: 'pointer',
   padding: 4,
   borderRadius: 6,
+};
+
+const drawerOverlay = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(0,0,0,.45)',
+  zIndex: 998,
+  display: 'flex',
+};
+
+const drawerPanel = {
+  position: 'fixed',
+  top: 0,
+  bottom: 0,
+  background: '#fff',
+  boxShadow: '0 10px 30px rgba(0,0,0,.3)',
+  padding: '10px 8px',
+  overflowY: 'auto',
+  WebkitOverflowScrolling: 'touch',
+  touchAction: 'pan-y',
+  overscrollBehavior: 'contain',
 };

@@ -5,6 +5,140 @@ import { useNavigate } from 'react-router-dom';
 import PageTopBar from '../components/PageTopBar';
 import ToastMessage from '../components/ToastMessage';
 
+/* ===================== Scroll horizontal robusto ===================== */
+function ScrollX({ children, minWidth = 1160, step = 200 }) {
+  const wrapRef = React.useRef(null);
+  const [overflow, setOverflow] = React.useState(false);
+  const [dragging, setDragging] = React.useState(false);
+  const startRef = React.useRef({ x: 0, left: 0 });
+
+  const check = () => {
+    const el = wrapRef.current;
+    if (!el) return;
+    setOverflow(el.scrollWidth > el.clientWidth + 1);
+  };
+
+  React.useEffect(() => {
+    check();
+    const on = () => check();
+    window.addEventListener('resize', on);
+    const id = setInterval(check, 500);
+    return () => {
+      window.removeEventListener('resize', on);
+      clearInterval(id);
+    };
+  }, []);
+
+  // Drag (mouse/touch/pointer)
+  React.useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+
+    const onPointerDown = (e) => {
+      setDragging(true);
+      el.setPointerCapture?.(e.pointerId || 1);
+      startRef.current = { x: e.clientX, left: el.scrollLeft };
+    };
+    const onPointerMove = (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startRef.current.x;
+      el.scrollLeft = startRef.current.left - dx;
+    };
+    const end = (e) => {
+      setDragging(false);
+      try { el.releasePointerCapture?.(e.pointerId || 1); } catch {}
+    };
+
+    el.addEventListener('pointerdown', onPointerDown, { passive: true });
+    el.addEventListener('pointermove', onPointerMove, { passive: true });
+    el.addEventListener('pointerup', end, { passive: true });
+    el.addEventListener('pointercancel', end, { passive: true });
+    return () => {
+      el.removeEventListener('pointerdown', onPointerDown);
+      el.removeEventListener('pointermove', onPointerMove);
+      el.removeEventListener('pointerup', end);
+      el.removeEventListener('pointercancel', end);
+    };
+  }, [dragging]);
+
+  const scrollBy = (delta) => {
+    const el = wrapRef.current;
+    if (!el) return;
+    el.scrollTo({ left: el.scrollLeft + delta, behavior: 'smooth' });
+  };
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div
+        ref={wrapRef}
+        style={{
+          maxWidth: '100%',
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          WebkitOverflowScrolling: 'touch',
+          paddingBottom: 4,
+          touchAction: 'pan-x',          // 👈 iPad
+          cursor: dragging ? 'grabbing' : 'grab',
+          maskImage: overflow
+            ? 'linear-gradient(to right, transparent 0, black 16px, black calc(100% - 16px), transparent 100%)'
+            : 'none',
+          WebkitMaskImage: overflow
+            ? 'linear-gradient(to right, transparent 0, black 16px, black calc(100% - 16px), transparent 100%)'
+            : 'none',
+        }}
+      >
+        <div style={{ minWidth }}>{children}</div>
+      </div>
+
+      {overflow && (
+        <>
+          <button
+            aria-label="Desplazar a la izquierda"
+            onClick={() => scrollBy(-step)}
+            style={navBtnStyle('left')}
+          >
+            ←
+          </button>
+          <button
+            aria-label="Desplazar a la derecha"
+            onClick={() => scrollBy(step)}
+            style={navBtnStyle('right')}
+          >
+            →
+          </button>
+          <div style={hintStyle}>Desliza →</div>
+        </>
+      )}
+    </div>
+  );
+}
+
+const navBtnStyle = (side) => ({
+  position: 'absolute',
+  [side]: 4,
+  top: -8,
+  transform: side === 'right' ? 'translateY(-50%)' : 'translateY(-50%)',
+  background: 'rgba(0,0,0,.55)',
+  color: '#fff',
+  border: 'none',
+  borderRadius: 999,
+  padding: '2px 8px',
+  fontSize: 12,
+  cursor: 'pointer',
+});
+const hintStyle = {
+  position: 'absolute',
+  right: 44,
+  top: -8,
+  background: 'rgba(0,0,0,.55)',
+  color: '#fff',
+  fontSize: 12,
+  padding: '2px 8px',
+  borderRadius: 999,
+  pointerEvents: 'none',
+};
+/* ===================================================================== */
+
 export default function OrdenesMesero() {
   const [ordenes, setOrdenes] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -23,23 +157,16 @@ export default function OrdenesMesero() {
     setTimeout(() => setToast((p) => ({ ...p, show: false })), 2800);
   };
 
-  // ===== firma profunda para detectar cambios de estados =====
   const orderSig = (o) => {
     const items = (o.items || [])
       .map((it) => ({ id: it.id, tipo: String(it.tipo || ''), estado: String(it.estado || '') }))
       .sort((a, b) => a.id - b.id);
-    return JSON.stringify({
-      id: o.id,
-      mesa: o.mesa,
-      fin: !!o.finishedAt,
-      items,
-    });
+    return JSON.stringify({ id: o.id, mesa: o.mesa, fin: !!o.finishedAt, items });
   };
   const listSig = (arr) => (arr || []).map(orderSig).sort().join('|');
 
   useEffect(() => {
     cargar({ background: false });
-
     intervalRef.current = setInterval(() => cargar({ background: true }), 5000);
 
     const onFocus = () => cargar({ background: true });
@@ -56,15 +183,9 @@ export default function OrdenesMesero() {
   async function cargar({ background = false } = {}) {
     try {
       if (!background && firstLoadRef.current) setCargando(true);
-      // 🔒 Pedir solo las órdenes del mesero actual
-      const { data } = await http.get('/ordenes', {
-        params: { meseroId: usuario?.id },
-      });
+      const { data } = await http.get('/ordenes', { params: { meseroId: usuario?.id } });
       const next = Array.isArray(data) ? data : [];
-
-      // Defensa adicional en cliente
-      const soloMias = next.filter(o => String(o.meseroId || '') === String(usuario?.id || ''));
-
+      const soloMias = next.filter((o) => String(o.meseroId || '') === String(usuario?.id || ''));
       setOrdenes((prev) => (listSig(prev) === listSig(soloMias) ? prev : soloMias));
       setError('');
     } catch (e) {
@@ -80,7 +201,6 @@ export default function OrdenesMesero() {
 
   const norm = (s) => String(s || '').trim().toUpperCase();
 
-  // Para CANCELAR: bloqueada si cocina ya la tomó (preparación o listo)
   const ordenTomadaPorCocina = (orden) =>
     (Array.isArray(orden?.items) ? orden.items : []).some((it) =>
       ['PREPARANDO', 'EN_PREPARACION', 'LISTO'].includes(norm(it.estado))
@@ -111,7 +231,6 @@ export default function OrdenesMesero() {
     }
   };
 
-  // === Editar: SIEMPRE permitido (aunque haya EN_PREPARACION o LISTO). La vista de edición controla qué se puede borrar. ===
   const editarOrden = (orden) => {
     localStorage.setItem(
       'ordenEnEdicion',
@@ -133,7 +252,6 @@ export default function OrdenesMesero() {
     navigate('/mesero');
   };
 
-  // ---- Finalizar ----
   const puedeFinalizar = (orden) => {
     if (orden.finishedAt) return false;
     const items = Array.isArray(orden.items) ? orden.items : [];
@@ -178,7 +296,7 @@ export default function OrdenesMesero() {
     if (s === 'PENDIENTE') return { ...base, background: '#a68b00' };
     if (s === 'ASIGNADO') return { ...base, background: '#0d9488' };
     if (s === 'PREPARANDO' || s === 'EN_PREPARACION') return { ...base, background: '#006666' };
-    return { ...base, background: '#2e7d32' }; // LISTO
+    return { ...base, background: '#2e7d32' };
   };
 
   const RowGrid = ({ left, right, isHeader = false }) => (
@@ -197,7 +315,7 @@ export default function OrdenesMesero() {
 
   const tdActions = {
     padding: '0.9rem',
-    borderBottom: '1px solid ' + '#ddd',
+    borderBottom: '1px solid #ddd',
     verticalAlign: 'middle',
   };
 
@@ -223,7 +341,6 @@ export default function OrdenesMesero() {
     textAlign: 'center',
   };
 
-  /* ======================= Secciones bonificadas ======================= */
   function Section({ color, icon, title, items }) {
     if (!items?.length) return null;
     return (
@@ -236,23 +353,8 @@ export default function OrdenesMesero() {
           boxShadow: '0 1px 0 rgba(0,0,0,.06) inset',
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            marginBottom: 8,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 18,
-              width: 28,
-              textAlign: 'center',
-            }}
-          >
-            {icon}
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+          <div style={{ fontSize: 18, width: 28, textAlign: 'center' }}>{icon}</div>
           <div
             style={{
               fontWeight: 900,
@@ -264,14 +366,7 @@ export default function OrdenesMesero() {
           >
             {title}
           </div>
-          <div
-            style={{
-              marginLeft: 'auto',
-              fontSize: 12,
-              fontWeight: 800,
-              opacity: 0.8,
-            }}
-          >
+          <div style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 800, opacity: 0.8 }}>
             {items.length} {items.length === 1 ? 'ítem' : 'ítems'}
           </div>
         </div>
@@ -281,7 +376,15 @@ export default function OrdenesMesero() {
             <RowGrid
               key={`sec-${title}-${idx}-${r.id || idx}`}
               left={
-                <div style={{ display: 'flex', gap: 6, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 6,
+                    whiteSpace: 'normal',
+                    wordBreak: 'break-word',
+                    overflowWrap: 'anywhere',
+                  }}
+                >
                   <span>•</span>
                   <span>
                     <strong>{r.nombre}</strong> – Q{Number(r.precio).toFixed(2)}
@@ -296,10 +399,18 @@ export default function OrdenesMesero() {
       </div>
     );
   }
-  /* ===================================================================== */
 
   return (
-    <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: 'Segoe UI, sans-serif' }}>
+    <div
+      style={{
+        height: '100vh',
+        width: '100vw',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        fontFamily: 'Segoe UI, sans-serif',
+      }}
+    >
       <PageTopBar title="Órdenes enviadas" backTo="/panel" />
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '2rem', boxSizing: 'border-box' }}>
@@ -310,66 +421,65 @@ export default function OrdenesMesero() {
         ) : error ? (
           <p style={{ color: 'red' }}>{error}</p>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1rem', tableLayout: 'fixed' }}>
-            <thead>
-              <tr style={{ background: '#006666', color: '#fff' }}>
-                <th style={{ ...th, width: '12rem' }}>Código</th>
-                <th style={{ ...th, width: '6rem' }}>Mesa</th>
-                <th style={{ ...th, width: '14rem' }}>Mesero</th>
-                <th style={th}>Detalle (platillos y bebidas)</th>
-                <th style={{ ...th, width: '18rem' }}>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ordenes.map((orden, i) => {
-                const items = Array.isArray(orden.items) ? orden.items : [];
-                const platillos = items.filter((it) => norm(it.tipo) !== 'BEBIDA');
-                const bebidas   = items.filter((it) => norm(it.tipo) === 'BEBIDA');
+          <ScrollX minWidth={1160} step={220}>
+            <table
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                marginTop: '1rem',
+                tableLayout: 'auto',
+              }}
+            >
+              <thead>
+                <tr style={{ background: '#006666', color: '#fff' }}>
+                  <th style={{ ...th, minWidth: '10rem' }}>Código</th>
+                  <th style={{ ...th, minWidth: '6rem' }}>Mesa</th>
+                  <th style={{ ...th, minWidth: '12rem' }}>Mesero</th>
+                  <th style={{ ...th, minWidth: '28rem' }}>Detalle (platillos y bebidas)</th>
+                  <th style={{ ...th, minWidth: '14rem' }}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ordenes.map((orden, i) => {
+                  const items = Array.isArray(orden.items) ? orden.items : [];
+                  const platillos = items.filter((it) => norm(it.tipo) !== 'BEBIDA');
+                  const bebidas = items.filter((it) => norm(it.tipo) === 'BEBIDA');
 
-                return (
-                  <tr key={orden.id} style={{ background: i % 2 === 0 ? '#f9f9f9' : '#fff' }}>
-                    <td style={td}>{orden.codigo || `#${orden.id}`}</td>
-                    <td style={td}>{orden.mesa}</td>
-                    <td style={td}>{orden.mesero?.nombre || usuario?.nombre}</td>
-
-                    {/* Detalle por secciones */}
-                    <td style={{ ...td, paddingTop: 12, paddingBottom: 12 }}>
-                      <div style={{ display: 'grid', rowGap: 12 }}>
-                        <Section color="#0f766e" icon="🍽️" title="Platillos" items={platillos} />
-                        <Section color="#7c3aed" icon="🥤" title="Bebidas" items={bebidas} />
-                      </div>
-                    </td>
-
-                    <td style={tdActions}>
-                      <div style={actionsWrap}>
-                        {/* Editar SIEMPRE habilitado */}
-                        <button onClick={() => editarOrden(orden)} style={accionBtn}>Editar</button>
-
-                        {/* Cancelar bloquea si cocina ya tomó la orden */}
-                        <button
-                          onClick={() => abrirConfirm(orden)}
-                          style={{ ...accionBtn, background: '#e60000' }}
-                        >
-                          Cancelar
-                        </button>
-
-                        {puedeFinalizar(orden) && (
-                          <button
-                            onClick={() => finalizarOrden(orden)}
-                            style={{ ...accionBtn, background: '#2563eb', minWidth: 110 }}
-                            disabled={finishingId === orden.id}
-                            title="Terminar orden (items listos)"
-                          >
-                            {finishingId === orden.id ? 'Terminando…' : 'Terminar'}
+                  return (
+                    <tr key={orden.id} style={{ background: i % 2 === 0 ? '#f9f9f9' : '#fff' }}>
+                      <td style={td}>{orden.codigo || `#${orden.id}`}</td>
+                      <td style={td}>{orden.mesa}</td>
+                      <td style={td}>{orden.mesero?.nombre || usuario?.nombre}</td>
+                      <td style={{ ...td, paddingTop: 12, paddingBottom: 12 }}>
+                        <div style={{ display: 'grid', rowGap: 12 }}>
+                          <Section color="#0f766e" icon="🍽️" title="Platillos" items={platillos} />
+                          <Section color="#7c3aed" icon="🥤" title="Bebidas" items={bebidas} />
+                        </div>
+                      </td>
+                      <td style={tdActions}>
+                        <div style={actionsWrap}>
+                          <button onClick={() => editarOrden(orden)} style={accionBtn}>Editar</button>
+                          <button onClick={() => abrirConfirm(orden)} style={{ ...accionBtn, background: '#e60000' }}>
+                            Cancelar
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                          {puedeFinalizar(orden) && (
+                            <button
+                              onClick={() => finalizarOrden(orden)}
+                              style={{ ...accionBtn, background: '#2563eb', minWidth: 110 }}
+                              disabled={finishingId === orden.id}
+                              title="Terminar orden (items listos)"
+                            >
+                              {finishingId === orden.id ? 'Terminando…' : 'Terminar'}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </ScrollX>
         )}
       </div>
 
@@ -435,5 +545,4 @@ const btnDanger = {
   border: 'none',
   borderRadius: 8,
   fontWeight: 700,
-  cursor: 'pointer',
 };
