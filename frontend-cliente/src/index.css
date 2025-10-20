@@ -182,3 +182,28 @@ img,button,input,textarea{ max-width:100%; box-sizing:border-box; }
     display: none !important;
   }
 }
+/* === Tabs de categorías: scroll horizontal en móvil/tablet === */
+.cat-tabs{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  width:100%;
+  max-width:100%;
+  overflow-x:auto;          /* <- permite desplazamiento horizontal */
+  overflow-y:hidden;
+  padding:6px 2px;
+  -webkit-overflow-scrolling: touch;   /* inercia en iOS */
+  overscroll-behavior-x: contain;      /* evita arrastrar toda la página */
+  scrollbar-width: thin;               /* firefox */
+}
+.cat-tabs::-webkit-scrollbar{ height:6px; }    /* opcional: fino en webkit */
+.cat-tabs::-webkit-scrollbar-thumb{ background:rgba(0,0,0,.2); border-radius:8px; }
+
+/* Los ítems no se encogen y se colocan en línea para poder hacer scroll */
+.cat-tabs > *{
+  flex: 0 0 auto;
+}
+
+/* Evita que el contenido empuje el layout y genere scroll horizontal global */
+html, body { max-width: 100%; overflow-x: hidden; }
+.cl-main .container, section { min-width: 0; }
