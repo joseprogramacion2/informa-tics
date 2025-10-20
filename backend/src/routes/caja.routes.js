@@ -54,9 +54,9 @@ function getUidFlex(req) {
   // 4) Body JSON
   const fromBody = Number(
     (req?.body && (
-      req.body.cajeroId ??
-      req.body.userId   ??
-      req.body.adminId  ??
+      req.body.cajeroId ?? 
+      req.body.userId   ?? 
+      req.body.adminId  ?? 
       (req.body.turno && req.body.turno.cajeroId)
     )) || 0
   );
@@ -191,10 +191,42 @@ function denomsTotal(raw){
 }
 
 /* ====== Propina (helpers) ====== */
+
+/** Compatibilidad con setting clave `tip_percent` */
 async function getTipPercent() {
   const s = await prisma.setting.findUnique({ where: { key: 'tip_percent' } });
   const n = Number(s?.value ?? 0);
   return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/** Lee configuración de propina.
+ *  - Intenta tabla de reglas (propinaRegla) si existe.
+ *  - Si no existe, cae a settings: `tip_active` (bool) y `tip_percent` (num).
+ */
+async function getTipConfig() {
+  // 1) Intentar tabla de reglas (si existe)
+  try {
+    const regla = await prisma.propinaRegla.findFirst({
+      where: { activa: true, scope: 'CAJA' },
+      orderBy: { id: 'desc' },
+      select: { activa: true, porcentaje: true }
+    });
+    if (regla) {
+      const pct = Number(regla.porcentaje || 0);
+      return { activa: !!regla.activa && pct > 0, porcentaje: pct > 0 ? pct : 0 };
+    }
+  } catch { /* Si no existe la tabla, continuamos */ }
+
+  // 2) Fallback a settings
+  let activa = false;
+  try {
+    const sAct = await prisma.setting.findUnique({ where: { key: 'tip_active' } });
+    const val = String(sAct?.value ?? '').toLowerCase();
+    activa = ['1','true','sí','si','yes','on'].includes(val);
+  } catch {}
+
+  const porcentaje = await getTipPercent();
+  return { activa: !!activa && porcentaje > 0, porcentaje };
 }
 
 /** ¿Debe aplicarse propina? Local = sí; Online no-local = no. */
@@ -218,11 +250,11 @@ router.get('/stream', (req, res) => {
 });
 
 /* ✅ NUEVO: Propina visible para CAJA (solo lectura)
-   GET /caja/propina -> { tipPercent } */
+   GET /caja/propina -> { activa, porcentaje } */
 router.get('/propina', requirePerm(['CAJA'], { strict: false }), async (_req, res) => {
   try {
-    const tipPercent = await getTipPercent();
-    res.json({ tipPercent });
+    const { activa, porcentaje } = await getTipConfig();
+    res.json({ activa, porcentaje, tipPercent: porcentaje });
   } catch (e) {
     res.status(500).json({ error: 'No se pudo obtener propina' });
   }
@@ -346,9 +378,9 @@ router.post('/pagar', requirePerm(['CAJA'], { strict: false }), async (req, res)
     const anticipoPend = await anticipoRestante(o.id);
     const anticipo = reserva ? Math.min(Number(reserva.monto || 50), anticipoPend) : anticipoPend;
 
-    // ===== Propina (aplicada automáticamente por backend) =====
-    const tipPercent = await getTipPercent();
-    const applyTip = await shouldApplyTip(o.id);
+    // ===== Propina (respeta "activa") =====
+    const { activa: tipActiva, porcentaje: tipPercent } = await getTipConfig();
+    const applyTip = tipActiva && await shouldApplyTip(o.id);
     const base = Math.max(0, total - anticipo);
     const propina = applyTip ? Number((base * (tipPercent / 100)).toFixed(2)) : 0;
     const neto = Number((base + propina).toFixed(2));
@@ -371,7 +403,7 @@ router.post('/pagar', requirePerm(['CAJA'], { strict: false }), async (req, res)
         metodoPago,
         // Montos
         subtotal: base,
-        impuestos: propina,            // << Propina registrada aquí
+        impuestos: propina,            // << Propina registrada aquí si aplica
         descuentos: 0,
         anticipoAplicado: Number(anticipo || 0),
         totalAPagar: neto,
@@ -439,9 +471,9 @@ async function pagarParcialHandler(req, res) {
     const anticipoPend = await anticipoRestante(o.id);
     const anticipoAplicar = Math.min(anticipoPend, totalSel);
 
-    // ===== Propina (aplicada también en parcial) =====
-    const tipPercent = await getTipPercent();
-    const applyTip = await shouldApplyTip(o.id);
+    // ===== Propina (respeta "activa") =====
+    const { activa: tipActiva, porcentaje: tipPercent } = await getTipConfig();
+    const applyTip = tipActiva && await shouldApplyTip(o.id);
     const base = Math.max(0, totalSel - anticipoAplicar);
     const propina = applyTip ? Number((base * (tipPercent / 100)).toFixed(2)) : 0;
     const neto = Number((base + propina).toFixed(2));
@@ -462,7 +494,7 @@ async function pagarParcialHandler(req, res) {
         ordenId: o.id,
         metodoPago,
         subtotal: base,
-        impuestos: propina,         // << Propina aquí también
+        impuestos: propina,         // << Propina aquí también si aplica
         descuentos: 0,
         anticipoAplicado: Number(anticipoAplicar || 0),
         totalAPagar: neto,
