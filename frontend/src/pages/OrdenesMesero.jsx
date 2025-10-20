@@ -90,25 +90,7 @@ function ScrollX({ children, minWidth = 1160, step = 200 }) {
         <div style={{ minWidth }}>{children}</div>
       </div>
 
-      {overflow && (
-        <>
-          <button
-            aria-label="Desplazar a la izquierda"
-            onClick={() => scrollBy(-step)}
-            style={navBtnStyle('left')}
-          >
-            ←
-          </button>
-          <button
-            aria-label="Desplazar a la derecha"
-            onClick={() => scrollBy(step)}
-            style={navBtnStyle('right')}
-          >
-            →
-          </button>
-          <div style={hintStyle}>Desliza →</div>
-        </>
-      )}
+      
     </div>
   );
 }

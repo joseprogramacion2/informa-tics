@@ -144,10 +144,77 @@ function ConfirmarEnvioModal({
   );
 }
 
+/* ======= Barra horizontal de categorías (compacto) ======= */
+function CatBar({ categorias = [], selectedId, onSelect }) {
+  const scrollerRef = useRef(null);
+  const [canScroll, setCanScroll] = useState(false);
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const check = () => setCanScroll(el.scrollWidth > el.clientWidth + 4);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const scrollBy = (dx) => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dx, behavior: 'smooth' });
+  };
+
+  return (
+    <div style={{ position: 'relative', padding: '8px 10px', background: '#fff' }}>
+      {canScroll && (
+        <>
+          <button aria-label="izq" onClick={() => scrollBy(-180)} style={chipArrowLeft}>‹</button>
+          <button aria-label="der" onClick={() => scrollBy(180)} style={chipArrowRight}>›</button>
+        </>
+      )}
+      <div
+        ref={scrollerRef}
+        style={{
+          display: 'flex',
+          gap: 8,
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          scrollSnapType: 'x mandatory',
+          paddingBottom: 4,
+          scrollbarWidth: 'thin'
+        }}
+      >
+        {categorias.map((cat) => {
+          const active = selectedId === cat.id;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => onSelect?.(cat.id)}
+              style={{
+                whiteSpace: 'nowrap',
+                padding: '8px 14px',
+                borderRadius: 999,
+                border: '1px solid ' + (active ? '#0f766e' : '#cbd5e1'),
+                background: active ? '#0f766e' : '#fff',
+                color: active ? '#fff' : '#0f172a',
+                fontWeight: 800,
+                scrollSnapAlign: 'start',
+                cursor: 'pointer'
+              }}
+            >
+              {cat.nombre}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ============ Vista principal ============ */
 export default function VistaMesero() {
   const isCompact = useCompact(1100);
-  const [showCats, setShowCats] = useState(false);
   const [showCart, setShowCart] = useState(false);
 
   const [categorias, setCategorias] = useState([]);
@@ -356,7 +423,6 @@ export default function VistaMesero() {
         { uid: makeUid(), id: p.id, nombre: p.nombre, precio: p.precio, nota: '', cantidad: 1, tipo },
       ];
     });
-    // ✅ Feedback claro al usuario (PC/tablet)
     showToast(`Agregado: ${p.nombre}`, 'success');
   };
 
@@ -387,7 +453,7 @@ export default function VistaMesero() {
       },
     ]);
     setMostrarNotas(false);
-    showToast(`Agregado: ${platilloActual.nombre}${notaLimpia ? ` (nota)` : ''}`, 'success'); // ✅ feedback
+    showToast(`Agregado: ${platilloActual.nombre}${notaLimpia ? ` (nota)` : ''}`, 'success');
     setPlatilloActual(null);
     setNotaTemporal('');
   };
@@ -626,30 +692,29 @@ export default function VistaMesero() {
     >
       <PageTopBar title={ordenEditId ? 'Editar Orden' : 'Generar Orden'} backTo="/panel" />
 
-      {/* Barra de acciones compactas (solo cuando isCompact) */}
+      {/* Barra compacta: chips de categorías + mesa + ver pedido */}
       {isCompact && (
-        <div style={{
-          display: 'flex',
-          gap: 8,
-          padding: '8px 10px',
-          borderBottom: '1px solid #e5e7eb',
-          background: '#fff',
-          position: 'sticky',
-          top: 48, // aprox alto de PageTopBar
-          zIndex: 4
-        }}>
-          <button onClick={() => setShowCats(true)} style={btnGhost}>☰ Categorías</button>
-          <button onClick={() => setShowCart(true)} style={btnConfirm}>
-            🧺 Ver pedido {carrito.length > 0 ? `· Q${totalCarrito.toFixed(2)}` : ''}
-          </button>
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <strong>Mesa:</strong>
-            {mesaSeleccionada ? <span style={chipMesa}>#{mesaSeleccionada}</span> : <span style={{ color: '#b91c1c', fontWeight: 700 }}>Selecciona</span>}
-            {!ordenEditId && (
-              <button onClick={() => setMostrarMesaModal(true)} style={btnGhost}>
-                Cambiar
-              </button>
-            )}
+        <div style={{ position: 'sticky', top: 48, zIndex: 4, background: '#fff', borderBottom: '1px solid #e5e7eb' }}>
+          <CatBar
+            categorias={categorias}
+            selectedId={categoriaSeleccionada}
+            onSelect={(id) => setCategoriaSeleccionada(id)}
+          />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px' }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <strong>Mesa:</strong>
+              {mesaSeleccionada ? (
+                <span style={chipMesa}>#{mesaSeleccionada}</span>
+              ) : (
+                <span style={{ color: '#b91c1c', fontWeight: 700 }}>Selecciona</span>
+              )}
+              {!ordenEditId && (
+                <button onClick={() => setMostrarMesaModal(true)} style={btnGhost}>Cambiar</button>
+              )}
+            </div>
+            <button onClick={() => setShowCart(true)} style={btnConfirm}>
+              🧺 Ver pedido {carrito.length > 0 ? `· Q${totalCarrito.toFixed(2)}` : ''}
+            </button>
           </div>
         </div>
       )}
@@ -727,7 +792,7 @@ export default function VistaMesero() {
               .map((p) => (
                 <div
                   key={p.id}
-                  draggable={!mustSelectMesa && !isCompact} // en móvil/tablet suele no usar DnD
+                  draggable={!mustSelectMesa && !isCompact}
                   onDragStart={onDragStart(p)}
                   style={{
                     background: '#fff',
@@ -860,38 +925,7 @@ export default function VistaMesero() {
         )}
       </div>
 
-      {/* ======= Drawers en modo compacto ======= */}
-      {isCompact && showCats && (
-        <Drawer side="left" onClose={() => setShowCats(false)}>
-          <h3 style={{ marginTop: 0 }}>Categorías</h3>
-          {categorias.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => { setCategoriaSeleccionada(cat.id); setShowCats(false); }}
-              style={{
-                display: 'block',
-                width: '100%',
-                marginBottom: '.8rem',
-                padding: '.6rem',
-                fontSize: '1rem',
-                backgroundColor: categoriaSeleccionada === cat.id ? '#004d4d' : '#eee',
-                color: categoriaSeleccionada === cat.id ? '#fff' : '#000',
-                border: 'none',
-                borderRadius: 8,
-                cursor: 'pointer',
-              }}
-            >
-              {cat.nombre}
-            </button>
-          ))}
-          {!ordenEditId && (
-            <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
-              {mustSelectMesa ? 'Selecciona una mesa para comenzar.' : ``}
-            </div>
-          )}
-        </Drawer>
-      )}
-
+      {/* ======= Drawer del pedido en modo compacto ======= */}
       {isCompact && showCart && (
         <Drawer side="right" onClose={() => setShowCart(false)} width={Math.min(520, Math.floor(window.innerWidth * 0.92))}>
           {/* Header compacto del pedido */}
@@ -1605,3 +1639,23 @@ const drawerPanel = {
   touchAction: 'pan-y',
   overscrollBehavior: 'contain',
 };
+
+/* Flechas para la barra de chips (compacto) */
+const chipArrowLeft = {
+  position: 'absolute',
+  left: 6,
+  top: '50%',
+  transform: 'translateY(-50%)',
+  border: '1px solid #cbd5e1',
+  borderRadius: 999,
+  background: '#fff',
+  cursor: 'pointer',
+  width: 28,
+  height: 28,
+  lineHeight: '26px',
+  textAlign: 'center',
+  fontWeight: 900,
+  zIndex: 2
+};
+const chipArrowRight = { ...chipArrowLeft, left: 'auto', right: 6 };
+
