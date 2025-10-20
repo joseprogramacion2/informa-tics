@@ -1,30 +1,7 @@
 // backend/src/services/pdf.js
-const fs = require('fs');
 const puppeteer = require('puppeteer');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-function resolveExecutablePath() {
-  if (process.env.PUPPETEER_EXECUTABLE_PATH) return process.env.PUPPETEER_EXECUTABLE_PATH;
-  if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
-
-  const candidatesLinux = [
-    '/usr/bin/google-chrome-stable',
-    '/usr/bin/google-chrome',
-    '/usr/bin/chromium-browser',
-    '/usr/bin/chromium',
-    '/snap/bin/chromium',
-  ];
-  const candidatesWin = [
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-  ];
-  const list = process.platform === 'win32' ? candidatesWin : candidatesLinux;
-  for (const p of list) {
-    try { if (fs.existsSync(p)) return p; } catch (_) {}
-  }
-  return null; // usa Chromium que trae Puppeteer
-}
 
 function resolveHeadless() {
   if (typeof process.env.PUPPETEER_HEADLESS !== 'undefined') {
@@ -43,22 +20,24 @@ function launchArgsByPlatform() {
     '--disable-dev-shm-usage',
     '--disable-gpu',
     '--font-render-hinting=medium',
+    // Nota: evitar '--single-process' en algunos hosts puede ayudar
+    // '--single-process',
+    // '--no-zygote',
   ];
-  if (process.platform !== 'win32') {
-    base.push('--no-zygote');
-    base.push('--single-process');
-  }
   return base;
 }
 
 async function createBrowser() {
-  const executablePath = resolveExecutablePath();
+  // 🔴 CLAVE: usar SIEMPRE el Chromium empacado por Puppeteer
+  // Ignoramos binarios del sistema (chromium-browser via snap)
+  const executablePath = puppeteer.executablePath(); // usa el que viene con puppeteer
   const headless = resolveHeadless();
   const args = launchArgsByPlatform();
+
   return puppeteer.launch({
     headless,
     args,
-    executablePath: executablePath || undefined,
+    executablePath, // forzado al empacado
   });
 }
 
@@ -74,7 +53,6 @@ async function htmlToPdfBuffer(html, pdfOptions = {}) {
     try {
       const page = await browser.newPage();
 
-      // (Opcional) viewport pequeño evita glitches en algunos hosts
       try { await page.setViewport({ width: 600, height: 800, deviceScaleFactor: 1 }); } catch {}
 
       await page.setContent(String(html || ''), {
@@ -82,7 +60,6 @@ async function htmlToPdfBuffer(html, pdfOptions = {}) {
         timeout: 30000,
       });
 
-      // pequeño respiro para estabilizar layout
       await sleep(minimal ? 80 : 150);
 
       try { await page.emulateMediaType('screen'); } catch {}
@@ -108,13 +85,12 @@ async function htmlToPdfBuffer(html, pdfOptions = {}) {
     const msg = String(err?.message || err);
     console.error('[pdf] ERROR generando PDF (intento 1):', msg);
 
-    // Reintento si es cierre/crash del target
     const isTargetClosed = /Target closed|Browser disconnected|Session closed|crash/i.test(msg);
     if (!isTargetClosed) throw err;
 
     try {
       console.warn('[pdf] Reintentando tras Target closed…');
-      return await attempt(true); // reintento “minimal”
+      return await attempt(true);
     } catch (err2) {
       console.error('[pdf] Reintento falló:', err2?.message || err2);
       throw err2;
