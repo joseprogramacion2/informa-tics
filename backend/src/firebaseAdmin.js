@@ -1,12 +1,28 @@
-// backend/src/firebaseAdmin.js
 const admin = require('firebase-admin');
 
 function parseSvcFromEnv() {
-  // Opción A: JSON entero en una variable
-  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  // A: Si tienes el JSON codificado en base64 (Railway)
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON_B64) {
     try {
-      const svc = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-      if (svc.private_key && svc.private_key.includes('\\n')) {
+      const jsonStr = Buffer.from(
+        process.env.FIREBASE_SERVICE_ACCOUNT_JSON_B64,
+        'base64'
+      ).toString('utf8');
+      const svc = JSON.parse(jsonStr);
+      if (svc.private_key?.includes('\\n')) {
+        svc.private_key = svc.private_key.replace(/\\n/g, '\n');
+      }
+      return svc;
+    } catch (err) {
+      console.error('[Firebase] Base64 inválido:', err.message);
+    }
+  }
+
+  // B: Si estás en local y tienes FIREBASE_SERVICE_ACCOUNT_JSON en .env
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    try {
+      const svc = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+      if (svc.private_key?.includes('\\n')) {
         svc.private_key = svc.private_key.replace(/\\n/g, '\n');
       }
       return svc;
@@ -15,30 +31,18 @@ function parseSvcFromEnv() {
     }
   }
 
-  // Opción B: 3 variables sueltas
-  const pid = process.env.FIREBASE_PROJECT_ID;
-  const email = process.env.FIREBASE_CLIENT_EMAIL;
-  let pk = process.env.FIREBASE_PRIVATE_KEY;
-  if (pid && email && pk) {
-    if (pk.includes('\\n')) pk = pk.replace(/\\n/g, '\n');
-    return { project_id: pid, client_email: email, private_key: pk };
-  }
-
   return null;
 }
 
 let inited = false;
-
 try {
   const svc = parseSvcFromEnv();
   if (svc) {
-    if (!admin.apps.length) {
-      admin.initializeApp({ credential: admin.credential.cert(svc) });
-      inited = true;
-      console.log('[Firebase] Admin inicializado con variables de entorno.');
-    }
+    admin.initializeApp({ credential: admin.credential.cert(svc) });
+    inited = true;
+    console.log('[Firebase] Admin inicializado ✅');
   } else {
-    console.warn('[Firebase] Sin credenciales en env. Admin NO inicializado (dev local sin Firebase).');
+    console.warn('[Firebase] Sin credenciales, Admin NO inicializado.');
   }
 } catch (e) {
   console.error('[Firebase] Falló la inicialización:', e);
