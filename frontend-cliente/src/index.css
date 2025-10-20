@@ -304,3 +304,35 @@ html, body{ max-width:100%; overflow-x:hidden; }
     min-width:140px;
   }
 }
+
+/* Evitar que el print tenga ancho fijo en móvil */
+.btn-print{ min-width: 140px; }
+@media (max-width: 600px){
+  .btn-print{ min-width: auto; }
+}
+
+/* En móvil: cabeza en columna y acciones a ancho completo */
+@media (max-width: 600px){
+  .order-card{ padding: 12px; }
+  .order-head{
+    flex-direction: column;
+    align-items: stretch;   /* que el bloque de acciones ocupe todo */
+    gap: 10px;
+  }
+  .order-actions{
+    margin-top: 6px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    gap: 8px;
+  }
+  .order-actions > button{
+    width: 100%;
+    min-width: 0;           /* por si algún inline se coló */
+    font-size: 14px;
+    padding: 10px 12px;
+  }
+}
+
+/* Por si acaso, nunca permitir overflow horizontal */
+html, body { max-width: 100%; overflow-x: hidden; }

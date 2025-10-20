@@ -758,14 +758,14 @@ export default function Historial(){
     Cancelar
   </button>
   <button
-    onClick={()=>imprimir(p)}
-    disabled={!puedeImprimir}
-    title={puedeImprimir ? "Imprimir ticket" : "Aún no disponible"}
-    className="btn-print"                             
-    style={{ ...btn('#111827','#fff', puedeImprimir) }} 
-  >
-    Imprimir ticket
-  </button>
+  onClick={()=>imprimir(p)}
+  disabled={!puedeImprimir}
+  title={puedeImprimir ? "Imprimir ticket" : "Aún no disponible"}
+  style={{ ...btn('#111827','#fff', puedeImprimir) }}
+  className="btn-print"
+>
+  Imprimir ticket
+</button>
 </div>
                 </div>
 
