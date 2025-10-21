@@ -1,15 +1,10 @@
-// frontend/src/pages/PanelPorRol.jsx
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import NotificationBellRepartidor from '../components/NotificationBellRepartidor';
 import TipoCambioBadge from '../components/TipoCambioBadge';
 
-const THEME = {
-  dark: '#1e3d59',
-  danger: '#e63946',
-};
+const THEME = { dark: '#1e3d59', danger: '#e63946' };
 
-/* ===== Utils permisos/roles ===== */
 const toKey = (s) => String(s || '').trim().toUpperCase().replace(/\s+/g, '_');
 const normRoleName = (name) => toKey(name);
 const normPermList = (list) =>
@@ -29,9 +24,7 @@ function logout() {
   finally { window.location.replace('/login'); }
 }
 
-/* ===== Catálogo ===== */
 const CATALOGO = [
-  // Admin
   { ruta: "/admin/usuarios",   texto: "Usuarios",          icono: "👥",  permiso: "CONFIGURAR_USUARIOS" },
   { ruta: "/admin/platillos",  texto: "Platillos",         icono: "🍽️", permiso: "CONFIGURAR_PLATILLOS" },
   { ruta: "/admin/historial",  texto: "Historial",         icono: "📜",  permiso: "VER_HISTORIAL" },
@@ -44,19 +37,15 @@ const CATALOGO = [
   { ruta: "/admin/caja-turnos",texto: "Turnos de caja",    icono: "💵",  permiso: "AUTORIZAR_APERTURA_CAJA" },
   { ruta: "/admin/reportes",   texto: "Reportería",        icono: "📊",  permiso: "REPORTES_VER" },
 
-  // Mesero
   { ruta: "/mesero",           texto: "Generar Orden",     icono: "🛎️", permiso: "GENERAR_ORDEN" },
   { ruta: "/mesero/ordenes",   texto: "Historial Órdenes", icono: "📋",  permiso: "VER_ORDENES" },
   { ruta: "/mesero/historial", texto: "Órdenes Terminadas",icono: "✅",  permiso: "ORDENES_TERMINADAS" },
 
-  // Cocina / Barra
   { ruta: "/cocina",           texto: "Cocina",            icono: "👨‍🍳", permiso: "COCINA_VIEW" },
   { ruta: "/barra",            texto: "Barra",             icono: "🍹",   permiso: "BARRA_VIEW" },
 
-  // Reparto
   { ruta: "/reparto",          texto: "Reparto",           icono: "🏍️",   permiso: "ACCESO_VISTA_REPARTO" },
 
-  // Caja
   { ruta: "/caja",             texto: "Caja",              icono: "💳", permiso: "CAJA" },
   { ruta: "/caja/ventas",      texto: "Ventas del día",    icono: "📈", permiso: "CAJA" },
   { ruta: "/caja/egresos",     texto: "Solicitar egresos", icono: "🏦", permiso: "CAJA" },
@@ -84,10 +73,7 @@ export default function PanelPorRol() {
 
   useEffect(() => {
     if (!usuario) return;
-    if (isAdmin) {
-      setRedirecting(true);
-      navigate('/admin', { replace: true });
-    }
+    if (isAdmin) { setRedirecting(true); navigate('/admin', { replace: true }); }
   }, [usuario, isAdmin, navigate]);
 
   if (!usuario || redirecting) {
@@ -106,7 +92,6 @@ export default function PanelPorRol() {
 
   return (
     <div className="panel-shell">
-      {/* Header */}
       <header className="panel-header">
         <div className="ph-left">
           <h1 title={usuario?.nombre || 'Usuario'}>
@@ -114,7 +99,6 @@ export default function PanelPorRol() {
           </h1>
         </div>
 
-        {/* Centro: tipo de cambio para CAJERO */}
         {esCajero && (
           <div className="ph-center">
             <div className="ph-center-inner"><TipoCambioBadge variant="inline" /></div>
@@ -131,7 +115,6 @@ export default function PanelPorRol() {
         </div>
       </header>
 
-      {/* Contenido */}
       <main className="panel-main">
         <h2 className="grid-title">Accesos según tus permisos</h2>
 
@@ -155,67 +138,71 @@ export default function PanelPorRol() {
         )}
       </main>
 
-      {/* Estilos */}
       <style>{BASE_CSS}</style>
       <style>{`
         .panel-header{
-          position: sticky; top: 0; z-index: 9;
+          position: sticky; top: 0; z-index: 50;
           background:${THEME.dark}; color:#fff;
-          padding: max(12px, env(safe-area-inset-top)) 16px 12px;
+          padding: max(12px, env(safe-area-inset-top)) 12px 12px;
           display:flex; align-items:center; justify-content:space-between;
           box-shadow: 0 2px 8px rgba(0,0,0,.15);
+          gap: 8px;
         }
-          .panel-header h1{
-          margin:0; font-size:18px;
-          max-width: 70vw;
-          overflow:hidden;
-          display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-          line-height: 1.2;
-        }
-        .ph-left{ min-width:0; }
+        .ph-left{ min-width:0; flex:1 1 auto; }
         .ph-center{
           position:absolute; left:50%; top:50%;
           transform:translate(-50%,-50%); pointer-events:none;
         }
         .ph-center-inner{ pointer-events:auto; }
-        .ph-right{ display:flex; align-items:center; gap:10px; }
-        .role-chip{
-          background:rgba(255,255,255,.14); padding:6px 10px; border-radius:999px; font-weight:600;
-          white-space:nowrap; max-width:38vw; overflow:hidden; text-overflow:ellipsis;
+        .ph-right{ display:flex; align-items:center; gap:8px; flex:0 0 auto; }
+
+        /* Título visible hasta 2 líneas en móvil */
+        .panel-header h1{
+          margin:0; font-size:18px; line-height:1.25;
+          max-width: calc(100vw - 24px - 250px);
+          display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+          overflow:hidden;
+          white-space: normal;
         }
+        @media (min-width: 992px){
+          .panel-header h1{ max-width:none; -webkit-line-clamp: unset; white-space: nowrap; }
+        }
+
+        .role-chip{
+          background:rgba(255,255,255,.14);
+          padding:6px 10px; border-radius:999px; font-weight:800;
+          white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+          max-width: 42vw; font-size: 14px;
+        }
+
         .logout{
           border:none; color:#fff; background:${THEME.danger};
-          border-radius:999px; padding:8px 12px; font-weight:700; cursor:pointer;
+          border-radius:999px; padding:8px 12px; font-weight:800; cursor:pointer;
           display:inline-flex; align-items:center; gap:8px;
         }
         .only-icon{ display:none; }
-
         @media (max-width:480px){
-          .role-chip{ padding:6px 8px; font-weight:700; }
-          .logout .label{ display:none; }   /* en móvil queda icono */
+          .logout .label{ display:none; }
           .only-icon{ display:inline; }
+          .role-chip{ max-width: 36vw; font-size:13px; }
         }
 
         .panel-main{
           max-width: 1000px; margin: 16px auto; padding: 16px;
-          background:#fff; border-radius:12px;
-          box-shadow: 0 4px 12px rgba(0,0,0,.05);
+          background:#fff; border-radius:12px; box-shadow: 0 4px 12px rgba(0,0,0,.05);
         }
         .grid-title{ margin: 0 0 14px; text-align:center; color:#333; }
         .callout{ padding:12px 14px; border-radius:10px; text-align:center; }
         .callout.warn{ background:#fff8e1; border:1px solid #ffe0a3; color:#7a5b00; }
 
-        /* GRID de accesos */
         .grid{
-          display:grid;
-          grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+          display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
           gap:14px;
         }
         .grid.single{
           grid-template-columns: repeat(auto-fit, 220px);
-          justify-content: center; /* centra la única tarjeta */
+          justify-content: center;
         }
-
         .tile{
           background:#f1f3f6; color:#1e3d59; text-decoration:none;
           min-height:110px; border-radius:12px;
