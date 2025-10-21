@@ -1,16 +1,16 @@
-// src/pages/OrdenesMesero.jsx
+// frontend/src/pages/OrdenesMesero.jsx
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { http } from '../config/client';
 import { useNavigate } from 'react-router-dom';
 import PageTopBar from '../components/PageTopBar';
 import ToastMessage from '../components/ToastMessage';
 
-/* ===================== Scroll horizontal robusto ===================== */
-function ScrollX({ children, minWidth = 1160, step = 200 }) {
+/* ===================== Scroll horizontal robusto (no roba clics) ===================== */
+function ScrollX({ children, minWidth = 1160 }) {
   const wrapRef = React.useRef(null);
   const [overflow, setOverflow] = React.useState(false);
   const [dragging, setDragging] = React.useState(false);
-  const startRef = React.useRef({ x: 0, left: 0 });
+  const startRef = React.useRef({ x: 0, left: 0, moved: false, active: false });
 
   const check = () => {
     const el = wrapRef.current;
@@ -29,24 +29,48 @@ function ScrollX({ children, minWidth = 1160, step = 200 }) {
     };
   }, []);
 
-  // Drag (mouse/touch/pointer)
+  const isInteractive = (el) =>
+    !!el?.closest?.(
+      'button, a, input, textarea, select, [role="button"], [data-nodrag="true"]'
+    );
+
   React.useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
 
+    const THRESHOLD = 8; // px de movimiento para considerar drag
+
     const onPointerDown = (e) => {
-      setDragging(true);
-      el.setPointerCapture?.(e.pointerId || 1);
-      startRef.current = { x: e.clientX, left: el.scrollLeft };
+      if (isInteractive(e.target)) return; // no iniciar drag sobre controles
+      startRef.current = {
+        x: e.clientX,
+        left: el.scrollLeft,
+        moved: false,
+        active: true,
+      };
     };
+
     const onPointerMove = (e) => {
-      if (!dragging) return;
-      const dx = e.clientX - startRef.current.x;
-      el.scrollLeft = startRef.current.left - dx;
+      const s = startRef.current;
+      if (!s.active) return;
+      const dx = e.clientX - s.x;
+
+      if (dragging || Math.abs(dx) > THRESHOLD) {
+        if (!dragging) {
+          setDragging(true);
+          try { el.setPointerCapture?.(e.pointerId || 1); } catch {}
+        }
+        s.moved = true;
+        el.scrollLeft = s.left - dx;
+      }
     };
+
     const end = (e) => {
+      if (dragging) {
+        try { el.releasePointerCapture?.(e.pointerId || 1); } catch {}
+      }
       setDragging(false);
-      try { el.releasePointerCapture?.(e.pointerId || 1); } catch {}
+      startRef.current = { x: 0, left: 0, moved: false, active: false };
     };
 
     el.addEventListener('pointerdown', onPointerDown, { passive: true });
@@ -61,12 +85,6 @@ function ScrollX({ children, minWidth = 1160, step = 200 }) {
     };
   }, [dragging]);
 
-  const scrollBy = (delta) => {
-    const el = wrapRef.current;
-    if (!el) return;
-    el.scrollTo({ left: el.scrollLeft + delta, behavior: 'smooth' });
-  };
-
   return (
     <div style={{ position: 'relative' }}>
       <div
@@ -77,7 +95,7 @@ function ScrollX({ children, minWidth = 1160, step = 200 }) {
           overflowY: 'hidden',
           WebkitOverflowScrolling: 'touch',
           paddingBottom: 4,
-          touchAction: 'pan-x',          // 👈 iPad
+          touchAction: 'pan-x',
           cursor: dragging ? 'grabbing' : 'grab',
           maskImage: overflow
             ? 'linear-gradient(to right, transparent 0, black 16px, black calc(100% - 16px), transparent 100%)'
@@ -89,36 +107,9 @@ function ScrollX({ children, minWidth = 1160, step = 200 }) {
       >
         <div style={{ minWidth }}>{children}</div>
       </div>
-
-      
     </div>
   );
 }
-
-const navBtnStyle = (side) => ({
-  position: 'absolute',
-  [side]: 4,
-  top: -8,
-  transform: side === 'right' ? 'translateY(-50%)' : 'translateY(-50%)',
-  background: 'rgba(0,0,0,.55)',
-  color: '#fff',
-  border: 'none',
-  borderRadius: 999,
-  padding: '2px 8px',
-  fontSize: 12,
-  cursor: 'pointer',
-});
-const hintStyle = {
-  position: 'absolute',
-  right: 44,
-  top: -8,
-  background: 'rgba(0,0,0,.55)',
-  color: '#fff',
-  fontSize: 12,
-  padding: '2px 8px',
-  borderRadius: 999,
-  pointerEvents: 'none',
-};
 /* ===================================================================== */
 
 export default function OrdenesMesero() {
@@ -138,6 +129,8 @@ export default function OrdenesMesero() {
     setToast({ show: true, message, type });
     setTimeout(() => setToast((p) => ({ ...p, show: false })), 2800);
   };
+
+  const norm = (s) => String(s || '').trim().toUpperCase();
 
   const orderSig = (o) => {
     const items = (o.items || [])
@@ -180,8 +173,6 @@ export default function OrdenesMesero() {
       }
     }
   }
-
-  const norm = (s) => String(s || '').trim().toUpperCase();
 
   const ordenTomadaPorCocina = (orden) =>
     (Array.isArray(orden?.items) ? orden.items : []).some((it) =>
@@ -323,6 +314,8 @@ export default function OrdenesMesero() {
     textAlign: 'center',
   };
 
+  const stopPointerDown = (e) => e.stopPropagation();
+
   function Section({ color, icon, title, items }) {
     if (!items?.length) return null;
     return (
@@ -403,7 +396,7 @@ export default function OrdenesMesero() {
         ) : error ? (
           <p style={{ color: 'red' }}>{error}</p>
         ) : (
-          <ScrollX minWidth={1160} step={220}>
+          <ScrollX minWidth={1160}>
             <table
               style={{
                 width: '100%',
@@ -440,12 +433,28 @@ export default function OrdenesMesero() {
                       </td>
                       <td style={tdActions}>
                         <div style={actionsWrap}>
-                          <button onClick={() => editarOrden(orden)} style={accionBtn}>Editar</button>
-                          <button onClick={() => abrirConfirm(orden)} style={{ ...accionBtn, background: '#e60000' }}>
+                          <button
+                            data-nodrag="true"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={() => editarOrden(orden)}
+                            style={accionBtn}
+                          >
+                            Editar
+                          </button>
+
+                          <button
+                            data-nodrag="true"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={() => abrirConfirm(orden)}
+                            style={{ ...accionBtn, background: '#e60000' }}
+                          >
                             Cancelar
                           </button>
+
                           {puedeFinalizar(orden) && (
                             <button
+                              data-nodrag="true"
+                              onPointerDown={(e) => e.stopPropagation()}
                               onClick={() => finalizarOrden(orden)}
                               style={{ ...accionBtn, background: '#2563eb', minWidth: 110 }}
                               disabled={finishingId === orden.id}

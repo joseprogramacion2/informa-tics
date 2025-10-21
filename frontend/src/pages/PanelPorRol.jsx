@@ -1,57 +1,35 @@
 // frontend/src/pages/PanelPorRol.jsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import NotificationBellRepartidor from '../components/NotificationBellRepartidor';
 import TipoCambioBadge from '../components/TipoCambioBadge';
 
-function logout() {
-  try {
-    localStorage.removeItem('usuario');
-    sessionStorage.clear();
-    window.location.replace('/login');
-  } catch {
-    window.location.replace('/login');
-  }
-}
+const THEME = {
+  dark: '#1e3d59',
+  danger: '#e63946',
+};
 
-// Helpers
+/* ===== Utils permisos/roles ===== */
 const toKey = (s) => String(s || '').trim().toUpperCase().replace(/\s+/g, '_');
-function normRoleName(name) { return toKey(name); }
-function normPermList(list) {
-  if (!Array.isArray(list)) return [];
-  return list
+const normRoleName = (name) => toKey(name);
+const normPermList = (list) =>
+  (Array.isArray(list) ? list : [])
     .map(p => (typeof p === 'string' ? p : (p?.clave || p?.nombre || p?.key || '')))
     .filter(Boolean)
     .map(toKey);
-}
-function getPermsFromUser(u) {
+
+const getPermsFromUser = (u) => {
   const p1 = normPermList(u?.permisos || []);
   if (p1.length) return p1;
-  const p2 = normPermList(u?.rol?.permisos || []);
-  return p2;
+  return normPermList(u?.rol?.permisos || []);
+};
+
+function logout() {
+  try { localStorage.removeItem('usuario'); sessionStorage.clear(); }
+  finally { window.location.replace('/login'); }
 }
 
-const tile = {
-  backgroundColor: '#f1f3f6',
-  textDecoration: 'none',
-  color: '#1e3d59',
-  minWidth: 160,
-  height: 120,
-  borderRadius: 10,
-  display: 'flex',
-  flexDirection: 'column',
-  justifyContent: 'center',
-  alignItems: 'center',
-  boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-  transition: 'transform .2s, box-shadow .2s',
-};
-const cont = {
-  minHeight: '100vh',
-  background: '#f9f9f9',
-  fontFamily: 'Segoe UI, sans-serif',
-};
-
-// Catálogo
+/* ===== Catálogo ===== */
 const CATALOGO = [
   // Admin
   { ruta: "/admin/usuarios",   texto: "Usuarios",          icono: "👥",  permiso: "CONFIGURAR_USUARIOS" },
@@ -61,26 +39,24 @@ const CATALOGO = [
   { ruta: "/admin/categorias", texto: "Categorías",        icono: "📂",  permiso: "GESTIONAR_CATEGORIAS" },
   { ruta: "/admin/roles",      texto: "Roles",             icono: "🛠",  permiso: "GESTIONAR_ROLES" },
   { ruta: "/admin/mesas",      texto: "Mesas",             icono: "🪑",  permiso: "CONFIGURAR_MESAS" },
-  { ruta: "/admin/reservacion",      texto: "Reservaciones",               icono: "📅",  permiso: "RESERVAR_MESAS" },
-  { ruta: "/admin/egresos",         texto: "Autorizar egresos", icono: "✅",  permiso: "AUTORIZAR_EGRESO" },
-  { ruta: "/admin/caja-turnos",     texto: "Turnos de caja",    icono: "💵",  permiso: "AUTORIZAR_APERTURA_CAJA" },
-  { ruta: "/admin/reportes",        texto: "Reportería",        icono: "📊",  permiso: "REPORTES_VER" },
+  { ruta: "/admin/reservacion",texto: "Reservaciones",     icono: "📅",  permiso: "RESERVAR_MESAS" },
+  { ruta: "/admin/egresos",    texto: "Autorizar egresos", icono: "✅",  permiso: "AUTORIZAR_EGRESO" },
+  { ruta: "/admin/caja-turnos",texto: "Turnos de caja",    icono: "💵",  permiso: "AUTORIZAR_APERTURA_CAJA" },
+  { ruta: "/admin/reportes",   texto: "Reportería",        icono: "📊",  permiso: "REPORTES_VER" },
 
   // Mesero
   { ruta: "/mesero",           texto: "Generar Orden",     icono: "🛎️", permiso: "GENERAR_ORDEN" },
   { ruta: "/mesero/ordenes",   texto: "Historial Órdenes", icono: "📋",  permiso: "VER_ORDENES" },
-  { ruta: "/mesero/historial",   texto: "Órdenes Terminadas", icono: "✅",  permiso: "ORDENES_TERMINADAS" },
+  { ruta: "/mesero/historial", texto: "Órdenes Terminadas",icono: "✅",  permiso: "ORDENES_TERMINADAS" },
 
-  // Cocina
+  // Cocina / Barra
   { ruta: "/cocina",           texto: "Cocina",            icono: "👨‍🍳", permiso: "COCINA_VIEW" },
-
-  // Barra
-  { ruta: "/barra",            texto: "Barra",             icono: "🍹", permiso: "BARRA_VIEW" },
+  { ruta: "/barra",            texto: "Barra",             icono: "🍹",   permiso: "BARRA_VIEW" },
 
   // Reparto
-  { ruta: "/reparto",          texto: "Reparto",           icono: "🏍️", permiso: "ACCESO_VISTA_REPARTO" },
+  { ruta: "/reparto",          texto: "Reparto",           icono: "🏍️",   permiso: "ACCESO_VISTA_REPARTO" },
 
-  // Cajero
+  // Caja
   { ruta: "/caja",             texto: "Caja",              icono: "💳", permiso: "CAJA" },
   { ruta: "/caja/ventas",      texto: "Ventas del día",    icono: "📈", permiso: "CAJA" },
   { ruta: "/caja/egresos",     texto: "Solicitar egresos", icono: "🏦", permiso: "CAJA" },
@@ -95,19 +71,15 @@ export default function PanelPorRol() {
 
   useEffect(() => {
     const u = JSON.parse(localStorage.getItem('usuario'));
-    if (!u) {
-      navigate('/login', { replace: true });
-      return;
-    }
+    if (!u) { navigate('/login', { replace: true }); return; }
     setUsuario(u);
     setPermisos(getPermsFromUser(u));
   }, [navigate]);
 
-  const roleName = normRoleName(usuario?.rol?.nombre);
-  const rolUpper = String(usuario?.rol?.nombre || '').toUpperCase();
+  const roleName  = normRoleName(usuario?.rol?.nombre);
+  const rolUpper  = String(usuario?.rol?.nombre || '').toUpperCase();
   const esRepartidor = rolUpper === 'REPARTIDOR';
-  const esCajero = rolUpper === 'CAJERO';
-
+  const esCajero     = rolUpper === 'CAJERO';
   const isAdmin = roleName === 'ADMINISTRADOR' || roleName === 'ADMIN';
 
   useEffect(() => {
@@ -120,28 +92,10 @@ export default function PanelPorRol() {
 
   if (!usuario || redirecting) {
     return (
-      <div style={cont}>
-        <header style={{
-          backgroundColor: '#1e3d59',
-          color: 'white',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '1rem 2rem',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
-        }}>
-          <h1 style={{ margin: 0, fontSize: '1.1rem' }}>Cargando…</h1>
-        </header>
-        <main style={{
-          maxWidth: 1000,
-          margin: '2rem auto',
-          padding: '2rem',
-          backgroundColor: '#ffffff',
-          borderRadius: 12,
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)'
-        }}>
-          <p>Preparando tu panel…</p>
-        </main>
+      <div className="panel-shell">
+        <header className="panel-header"><h1>Cargando…</h1></header>
+        <main className="panel-main"><p>Preparando tu panel…</p></main>
+        <style>{BASE_CSS}</style>
       </div>
     );
   }
@@ -151,104 +105,136 @@ export default function PanelPorRol() {
   const showDenied = location.state?.reason === 'forbidden';
 
   return (
-    <div style={cont}>
-      {/* Header del /panel */}
-      <header style={{
-        position: 'relative',            // necesario para centrar absoluto
-        backgroundColor: '#1e3d59',
-        color: 'white',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '1rem 2rem',
-        boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
-      }}>
-        <h1 style={{ margin: 0, fontSize: '1.1rem' }}>👤 Panel de {usuario?.nombre || 'Usuario'}</h1>
+    <div className="panel-shell">
+      {/* Header */}
+      <header className="panel-header">
+        <div className="ph-left">
+          <h1 title={usuario?.nombre || 'Usuario'}>
+            👤 Panel de {usuario?.nombre || 'Usuario'}
+          </h1>
+        </div>
 
-        {/* Centro absoluto: tipo de cambio SOLO CAJERO */}
+        {/* Centro: tipo de cambio para CAJERO */}
         {esCajero && (
-          <div style={{
-            position: 'absolute',
-            left: '50%', top: '50%',
-            transform: 'translate(-50%, -50%)',
-            pointerEvents: 'none'
-          }}>
-            <div style={{ pointerEvents: 'auto' }}>
-              <TipoCambioBadge variant="inline" />
-            </div>
+          <div className="ph-center">
+            <div className="ph-center-inner"><TipoCambioBadge variant="inline" /></div>
           </div>
         )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div className="ph-right">
           {esRepartidor && <NotificationBellRepartidor />}
-          <span>{roleName}</span>
-          <button onClick={logout} style={{
-            background: '#e63946',
-            color: '#fff',
-            border: 'none',
-            padding: '.5rem 1rem',
-            borderRadius: 6,
-            fontWeight: 'bold',
-            cursor: 'pointer'
-          }}>
-            Cerrar sesión
+          <span className="role-chip" title={roleName}>{roleName}</span>
+          <button className="logout" onClick={logout} aria-label="Cerrar sesión" title="Cerrar sesión">
+            <span className="only-icon">⎋</span>
+            <span className="label">Cerrar sesión</span>
           </button>
         </div>
       </header>
 
-      <main style={{
-        maxWidth: 1000,
-        margin: '2rem auto',
-        padding: '2rem',
-        backgroundColor: '#ffffff',
-        borderRadius: 12,
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)'
-      }}>
-        <h2 style={{ color: '#333', marginBottom: '1.5rem', textAlign: 'center' }}>
-          Accesos según tus permisos
-        </h2>
+      {/* Contenido */}
+      <main className="panel-main">
+        <h2 className="grid-title">Accesos según tus permisos</h2>
 
         {showDenied && (
-          <div style={{
-            background:'#fff8e1',
-            border:'1px solid #ffe0a3',
-            color:'#7a5b00',
-            padding:'0.8rem 1rem',
-            borderRadius:8,
-            marginBottom:'1rem',
-            textAlign:'center'
-          }}>
-            No tienes permisos para la vista solicitada.
-          </div>
+          <div className="callout warn">No tienes permisos para la vista solicitada.</div>
         )}
 
         {accesos.length === 0 ? (
-          <div style={{
-            background:'#fff8e1',
-            border:'1px solid #ffe0a3',
-            color:'#7a5b00',
-            padding:'1rem',
-            borderRadius:8,
-            textAlign:'center'
-          }}>
+          <div className="callout warn">
             No tienes accesos habilitados todavía. Contacta al administrador para asignarte permisos.
           </div>
         ) : (
-          <div style={{
-            display:'grid',
-            gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))',
-            gap:'1.2rem',
-            justifyItems:'center'
-          }}>
+          <div className={`grid ${accesos.length === 1 ? 'single' : ''}`}>
             {accesos.map(({ ruta, texto, icono }) => (
-              <Link key={ruta} to={ruta} style={tile}>
-                <div style={{ fontSize: '2rem' }}>{icono}</div>
-                <span style={{ marginTop: 8, fontWeight: 600 }}>{texto}</span>
+              <Link key={ruta} to={ruta} className="tile">
+                <div className="tile-ico">{icono}</div>
+                <span className="tile-txt">{texto}</span>
               </Link>
             ))}
           </div>
         )}
       </main>
+
+      {/* Estilos */}
+      <style>{BASE_CSS}</style>
+      <style>{`
+        .panel-header{
+          position: sticky; top: 0; z-index: 9;
+          background:${THEME.dark}; color:#fff;
+          padding: max(12px, env(safe-area-inset-top)) 16px 12px;
+          display:flex; align-items:center; justify-content:space-between;
+          box-shadow: 0 2px 8px rgba(0,0,0,.15);
+        }
+          .panel-header h1{
+          margin:0; font-size:18px;
+          max-width: 70vw;
+          overflow:hidden;
+          display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+          line-height: 1.2;
+        }
+        .ph-left{ min-width:0; }
+        .ph-center{
+          position:absolute; left:50%; top:50%;
+          transform:translate(-50%,-50%); pointer-events:none;
+        }
+        .ph-center-inner{ pointer-events:auto; }
+        .ph-right{ display:flex; align-items:center; gap:10px; }
+        .role-chip{
+          background:rgba(255,255,255,.14); padding:6px 10px; border-radius:999px; font-weight:600;
+          white-space:nowrap; max-width:38vw; overflow:hidden; text-overflow:ellipsis;
+        }
+        .logout{
+          border:none; color:#fff; background:${THEME.danger};
+          border-radius:999px; padding:8px 12px; font-weight:700; cursor:pointer;
+          display:inline-flex; align-items:center; gap:8px;
+        }
+        .only-icon{ display:none; }
+
+        @media (max-width:480px){
+          .role-chip{ padding:6px 8px; font-weight:700; }
+          .logout .label{ display:none; }   /* en móvil queda icono */
+          .only-icon{ display:inline; }
+        }
+
+        .panel-main{
+          max-width: 1000px; margin: 16px auto; padding: 16px;
+          background:#fff; border-radius:12px;
+          box-shadow: 0 4px 12px rgba(0,0,0,.05);
+        }
+        .grid-title{ margin: 0 0 14px; text-align:center; color:#333; }
+        .callout{ padding:12px 14px; border-radius:10px; text-align:center; }
+        .callout.warn{ background:#fff8e1; border:1px solid #ffe0a3; color:#7a5b00; }
+
+        /* GRID de accesos */
+        .grid{
+          display:grid;
+          grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+          gap:14px;
+        }
+        .grid.single{
+          grid-template-columns: repeat(auto-fit, 220px);
+          justify-content: center; /* centra la única tarjeta */
+        }
+
+        .tile{
+          background:#f1f3f6; color:#1e3d59; text-decoration:none;
+          min-height:110px; border-radius:12px;
+          box-shadow: 0 2px 6px rgba(0,0,0,.08);
+          display:flex; flex-direction:column; align-items:center; justify-content:center;
+          transition: transform .15s, box-shadow .15s;
+        }
+        .tile:hover{ transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,.12); }
+        .tile-ico{ font-size: 28px; line-height: 1; }
+        .tile-txt{ margin-top:8px; font-weight: 700; }
+      `}</style>
     </div>
   );
 }
+
+const BASE_CSS = `
+  .panel-shell{
+    min-height:100vh;
+    background:#f9f9f9;
+    font-family: Segoe UI, system-ui, -apple-system, Roboto, sans-serif;
+  }
+`;
